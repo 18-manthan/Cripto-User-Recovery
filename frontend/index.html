@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RUD - High-Value User Recovery Engine</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1>High-Value User Recovery Engine</h1>
+                <p>Real-time identification and recovery system for high-value crypto users</p>
+            </div>
+            <div class="health-status">
+                <span id="status-indicator" class="status-dot loading"></span>
+                <span id="status-text">Initializing...</span>
+            </div>
+        </header>
+
+        <!-- Dashboard Stats -->
+        <section class="stats-grid" id="stats-section">
+            <div class="stat-card loading">
+                <div class="spinner"></div>
+            </div>
+            <div class="stat-card loading">
+                <div class="spinner"></div>
+            </div>
+            <div class="stat-card loading">
+                <div class="spinner"></div>
+            </div>
+            <div class="stat-card loading">
+                <div class="spinner"></div>
+            </div>
+        </section>
+
+        <!-- Main Content -->
+        <div class="content-wrapper">
+            <!-- Sidebar Navigation -->
+            <aside class="sidebar">
+                <nav class="nav-menu">
+                    <a href="#" data-section="overview" class="nav-item active">
+                        <span class="icon">📊</span> Overview
+                    </a>
+                    <a href="#" data-section="risks" class="nav-item">
+                        <span class="icon">⚠️</span> Risk Flags
+                    </a>
+                    <a href="#" data-section="actions" class="nav-item">
+                        <span class="icon">⚡</span> Actions
+                    </a>
+                    <a href="#" data-section="scenarios" class="nav-item">
+                        <span class="icon">🎯</span> Scenarios
+                    </a>
+                    <a href="#" data-section="users" class="nav-item">
+                        <span class="icon">👥</span> Users
+                    </a>
+                </nav>
+            </aside>
+
+            <!-- Main Panel -->
+            <main class="main-content">
+                
+                <!-- Overview Section -->
+                <section id="overview" class="panel active">
+                    <h2>System Overview</h2>
+                    
+                    <div class="overview-grid">
+                        <div class="overview-card">
+                            <h3>📈 User Status Distribution</h3>
+                            <div id="user-status-chart" class="chart-placeholder"></div>
+                        </div>
+                        
+                        <div class="overview-card">
+                            <h3>🎯 Risk Severity Breakdown</h3>
+                            <div id="severity-chart" class="chart-placeholder"></div>
+                        </div>
+                        
+                        <div class="overview-card">
+                            <h3>⚡ Recovery Potential</h3>
+                            <div class="metric">
+                                <div class="metric-value" id="recovery-potential">$0</div>
+                                <div class="metric-label">Estimated Full Value</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-value" id="avg-recovery">$0</div>
+                                <div class="metric-label">Avg Per Action</div>
+                            </div>
+                        </div>
+                        
+                        <div class="overview-card">
+                            <h3>📋 Action Summary</h3>
+                            <div id="action-summary" class="action-summary"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Risk Flags Section -->
+                <section id="risks" class="panel">
+                    <div class="panel-header">
+                        <h2>Detected Risk Flags</h2>
+                        <div class="filters">
+                            <select id="risk-type-filter" class="filter-select">
+                                <option value="">All Risk Types</option>
+                                <option value="onboarding_delay">Onboarding Delay</option>
+                                <option value="inactivity">Inactivity</option>
+                                <option value="support_unresolved">Unresolved Support</option>
+                                <option value="abandoned">Abandoned Users</option>
+                            </select>
+                            <select id="risk-severity-filter" class="filter-select">
+                                <option value="">All Severities</option>
+                                <option value="critical">Critical</option>
+                                <option value="high">High</option>
+                                <option value="medium">Medium</option>
+                                <option value="low">Low</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="risk-flags-list" class="list-container"></div>
+                </section>
+
+                <!-- Actions Section -->
+                <section id="actions" class="panel">
+                    <div class="panel-header">
+                        <h2>Recommended Actions</h2>
+                        <div class="filters">
+                            <select id="action-status-filter" class="filter-select">
+                                <option value="">All Statuses</option>
+                                <option value="pending">Pending</option>
+                                <option value="approved">Approved</option>
+                                <option value="executed">Executed</option>
+                            </select>
+                            <select id="action-priority-filter" class="filter-select">
+                                <option value="">All Priorities</option>
+                                <option value="critical">Critical</option>
+                                <option value="high">High</option>
+                                <option value="medium">Medium</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="actions-list" class="list-container"></div>
+                </section>
+
+                <!-- Scenarios Section -->
+                <section id="scenarios" class="panel">
+                    <h2>Recovery Scenarios</h2>
+                    <div id="scenarios-grid" class="scenarios-grid"></div>
+                </section>
+
+                <!-- Users Section -->
+                <section id="users" class="panel">
+                    <div class="panel-header">
+                        <h2>Users Database</h2>
+                        <input type="text" id="user-search" class="search-input" placeholder="Search by user ID or email...">
+                    </div>
+                    <div id="users-list" class="list-container"></div>
+                </section>
+
+            </main>
+        </div>
+    </div>
+
+    <!-- User Detail Modal -->
+    <div id="user-modal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close">&times;</span>
+            <div id="user-detail-content"></div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

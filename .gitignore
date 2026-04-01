@@ -1,0 +1,19 @@
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+venv/
+.venv/
+
+# Local environment config
+.env
+
+# Local vector store data
+.chroma/
+
+# OS/editor noise
+.DS_Store
+
+ ./assistant_audit.jsonl
+ .conversation_memory.jsonl
