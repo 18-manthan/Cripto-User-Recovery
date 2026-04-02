@@ -1,161 +1,162 @@
 """
-Canonical Data Models for RUD System
-Unified entities across all crypto platform systems
+SQLAlchemy ORM Models for the High-Value User Recovery Engine.
+Canonical data model representing entities from multiple crypto platform systems.
 """
+
+from sqlalchemy import Column, String, Float, Integer, DateTime, Boolean, ForeignKey, Text
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship
 from datetime import datetime
-from typing import Optional, List, Dict, Any
-from enum import Enum
-from dataclasses import dataclass, asdict, field
+
+Base = declarative_base()
 
 
-class UserStatus(str, Enum):
-    ACTIVE = "active"
-    INACTIVE = "inactive"
-    ONBOARDING = "onboarding"
-    ABANDONED = "abandoned"
-    RECOVERED = "recovered"
-
-
-class SeverityLevel(str, Enum):
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-    CRITICAL = "critical"
-
-
-class ActionStatus(str, Enum):
-    PENDING = "pending"
-    APPROVED = "approved"
-    EXECUTED = "executed"
-    REJECTED = "rejected"
-
-
-@dataclass
-class UserProfile:
-    """Canonical user entity"""
-    user_id: str
-    email: str
-    name: str
-    status: UserStatus
-    creation_date: datetime
-    last_active: datetime
-    country: str
-    source: str  # acquisition source: ads, affiliate, referral, organic
-    high_value_score: float  # 0-100
+class UserProfile(Base):
+    """Core user profile aggregated from multiple sources."""
+    __tablename__ = "user_profiles"
     
-    # Metadata for identity resolution
-    external_id: Dict[str, str] = field(default_factory=dict)  # {system: id}
-    last_synced_at: datetime = field(default_factory=datetime.utcnow)
+    id = Column(String, primary_key=True)
+    email = Column(String, unique=True, nullable=False)
+    name = Column(String, nullable=False)
+    acquisition_source = Column(String)  # twitter, discord, affiliate, paid_ads, organic
+    lifecycle_stage = Column(String)  # onboarding, active, inactive, churned, high_value
+    estimated_ltv = Column(Float, default=0.0)
+    first_seen_at = Column(DateTime, default=datetime.utcnow)
+    last_activity_at = Column(DateTime)
+    country = Column(String)
     
-    def to_dict(self):
-        data = asdict(self)
-        data['status'] = self.status.value
-        data['creation_date'] = self.creation_date.isoformat()
-        data['last_active'] = self.last_active.isoformat()
-        data['last_synced_at'] = self.last_synced_at.isoformat()
-        return data
-
-
-@dataclass
-class Wallet:
-    """User wallet entity"""
-    wallet_id: str
-    user_id: str
-    blockchain: str  # "ethereum", "bitcoin", etc.
-    balance_usd: float
-    transaction_count: int
-    last_transaction: Optional[datetime]
-    created_at: datetime
+    # Multi-system tracking
+    source_system = Column(String, default="demo_platform")
+    external_id = Column(String)
+    last_synced_at = Column(DateTime, default=datetime.utcnow)
     
-    external_id: Dict[str, str] = field(default_factory=dict)
-    last_synced_at: datetime = field(default_factory=datetime.utcnow)
+    # Relationships
+    wallet = relationship("Wallet", uselist=False, back_populates="user", cascade="all, delete-orphan")
+    risk_flags = relationship("RiskFlag", back_populates="user", cascade="all, delete-orphan")
+    support_tickets = relationship("SupportTicket", back_populates="user", cascade="all, delete-orphan")
+    recovery_actions = relationship("RecoveryAction", back_populates="user", cascade="all, delete-orphan")
     
-    def to_dict(self):
-        data = asdict(self)
-        data['last_transaction'] = self.last_transaction.isoformat() if self.last_transaction else None
-        data['created_at'] = self.created_at.isoformat()
-        data['last_synced_at'] = self.last_synced_at.isoformat()
-        return data
+    def __repr__(self):
+        return f"<UserProfile(id={self.id}, stage={self.lifecycle_stage}, ltv={self.estimated_ltv})>"
 
 
-@dataclass
-class Campaign:
-    """Marketing campaign entity"""
-    campaign_id: str
-    user_id: str
-    campaign_name: str
-    channel: str  # "google_ads", "facebook", "affiliate", "email"
-    cpa: float  # Cost per acquisition
-    created_at: datetime
+class Wallet(Base):
+    """Wallet activity and balance data."""
+    __tablename__ = "wallets"
     
-    external_id: Dict[str, str] = field(default_factory=dict)
-    last_synced_at: datetime = field(default_factory=datetime.utcnow)
+    id = Column(String, primary_key=True)
+    user_id = Column(String, ForeignKey("user_profiles.id"), nullable=False)
+    blockchain = Column(String, default="ethereum")
+    balance_usd = Column(Float, default=0.0)
+    wallet_age_days = Column(Integer, default=0)
+    transaction_count = Column(Integer, default=0)
+    activity_score = Column(Float, default=0.0)  # 0-100
+    last_activity_at = Column(DateTime)
     
-    def to_dict(self):
-        data = asdict(self)
-        data['created_at'] = self.created_at.isoformat()
-        data['last_synced_at'] = self.last_synced_at.isoformat()
-        return data
-
-
-@dataclass
-class Ticket:
-    """Support ticket entity"""
-    ticket_id: str
-    user_id: str
-    subject: str
-    status: str  # "open", "in_progress", "resolved", "closed"
-    priority: str  # "low", "medium", "high"
-    created_at: datetime
-    last_updated: datetime
-    category: str  # "kyc", "wallet", "transaction", "general"
+    # Multi-system tracking
+    source_system = Column(String, default="demo_blockchain")
+    external_id = Column(String)
+    last_synced_at = Column(DateTime, default=datetime.utcnow)
     
-    external_id: Dict[str, str] = field(default_factory=dict)
-    last_synced_at: datetime = field(default_factory=datetime.utcnow)
+    user = relationship("UserProfile", back_populates="wallet")
     
-    def to_dict(self):
-        data = asdict(self)
-        data['created_at'] = self.created_at.isoformat()
-        data['last_updated'] = self.last_updated.isoformat()
-        data['last_synced_at'] = self.last_synced_at.isoformat()
-        return data
+    def __repr__(self):
+        return f"<Wallet(user_id={self.user_id}, balance={self.balance_usd})>"
 
 
-@dataclass
-class RiskFlag:
-    """Risk/Issue detection entity"""
-    flag_id: str
-    user_id: str
-    flag_type: str  # "onboarding_delay", "inactivity", "support_unresolved", "compliance_issue"
-    severity: SeverityLevel
-    detected_at: datetime
-    description: str
-    metadata: Dict[str, Any] = field(default_factory=dict)
+class RiskFlag(Base):
+    """Risk indicators for each user."""
+    __tablename__ = "risk_flags"
     
-    def to_dict(self):
-        data = asdict(self)
-        data['severity'] = self.severity.value
-        data['detected_at'] = self.detected_at.isoformat()
-        return data
-
-
-@dataclass
-class ActionRecommendation:
-    """Recommended recovery action"""
-    action_id: str
-    user_id: str
-    risk_flag_id: str
-    action_type: str  # "priority_support", "workflow_trigger", "account_flag", "personal_outreach"
-    status: ActionStatus
-    priority: str  # "low", "medium", "high"
-    reason: str
-    estimated_recovery_value: float
-    created_at: datetime
-    executed_at: Optional[datetime] = None
+    id = Column(String, primary_key=True)
+    user_id = Column(String, ForeignKey("user_profiles.id"), nullable=False)
+    flag_type = Column(String)  # onboarding_incomplete, inactivity, support_ticket, compliance, low_activity
+    severity = Column(String)  # critical, high, medium, low
+    description = Column(Text)
+    detected_at = Column(DateTime, default=datetime.utcnow)
+    days_since_detection = Column(Integer, default=0)
     
-    def to_dict(self):
-        data = asdict(self)
-        data['status'] = self.status.value
-        data['created_at'] = self.created_at.isoformat()
-        data['executed_at'] = self.executed_at.isoformat() if self.executed_at else None
-        return data
+    # Multi-system tracking
+    source_system = Column(String, default="demo_orchestrator")
+    external_id = Column(String)
+    last_synced_at = Column(DateTime, default=datetime.utcnow)
+    
+    user = relationship("UserProfile", back_populates="risk_flags")
+    
+    def __repr__(self):
+        return f"<RiskFlag(user_id={self.user_id}, type={self.flag_type}, severity={self.severity})>"
+
+
+class SupportTicket(Base):
+    """Support issues and their resolution status."""
+    __tablename__ = "support_tickets"
+    
+    id = Column(String, primary_key=True)
+    user_id = Column(String, ForeignKey("user_profiles.id"), nullable=False)
+    subject = Column(String)
+    status = Column(String)  # open, pending, resolved, escalated
+    priority = Column(String)  # critical, high, medium, low
+    category = Column(String)  # kyc_delay, withdrawal_issue, login_problem, transaction_error, compliance
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_updated = Column(DateTime, default=datetime.utcnow)
+    unresolved_days = Column(Integer, default=0)
+    
+    # Multi-system tracking
+    source_system = Column(String, default="demo_support")
+    external_id = Column(String)
+    last_synced_at = Column(DateTime, default=datetime.utcnow)
+    
+    user = relationship("UserProfile", back_populates="support_tickets")
+    
+    def __repr__(self):
+        return f"<SupportTicket(id={self.id}, user_id={self.user_id}, status={self.status})>"
+
+
+class RecoveryAction(Base):
+    """Actions taken or planned for recovery."""
+    __tablename__ = "recovery_actions"
+    
+    id = Column(String, primary_key=True)
+    user_id = Column(String, ForeignKey("user_profiles.id"), nullable=False)
+    action_type = Column(String)  # email_outreach, priority_support, workflow_trigger, account_review, incentive_offer
+    status = Column(String)  # pending, approved, executed, failed
+    priority = Column(String)  # critical, high, medium, low
+    reason = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    executed_at = Column(DateTime, nullable=True)
+    estimated_recovery_value = Column(Float, default=0.0)
+    
+    # Multi-system tracking
+    source_system = Column(String, default="demo_orchestrator")
+    external_id = Column(String)
+    last_synced_at = Column(DateTime, default=datetime.utcnow)
+    
+    user = relationship("UserProfile", back_populates="recovery_actions")
+    
+    def __repr__(self):
+        return f"<RecoveryAction(id={self.id}, action_type={self.action_type}, status={self.status})>"
+
+
+class Campaign(Base):
+    """Marketing campaigns and their performance metrics."""
+    __tablename__ = "campaigns"
+    
+    id = Column(String, primary_key=True)
+    campaign_name = Column(String)
+    channel = Column(String)  # twitter, discord, affiliate, paid_ads, content, organic
+    spend_usd = Column(Float, default=0.0)
+    conversions = Column(Integer, default=0)
+    revenue_usd = Column(Float, default=0.0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Calculated fields
+    cpa = Column(Float, default=0.0)  # Cost per acquisition
+    roi = Column(Float, default=0.0)  # Return on investment
+    
+    # Multi-system tracking
+    source_system = Column(String, default="demo_marketing")
+    external_id = Column(String)
+    last_synced_at = Column(DateTime, default=datetime.utcnow)
+    
+    def __repr__(self):
+        return f"<Campaign(id={self.id}, channel={self.channel}, cpa={self.cpa})>"
