@@ -52,8 +52,18 @@ function setupNavigation() {
             else if (section === 'actions') renderActions();
             else if (section === 'scenarios') renderScenarios();
             else if (section === 'users') renderUsers();
+            else if (section === 'chat') renderChat();
         });
     });
+}
+
+// Render chat panel when switched to
+function renderChat() {
+    // Chat interface is already rendered in HTML, just set up event listeners
+    const chatInput = document.getElementById('chat-input');
+    if (chatInput && chatInput.value === '') {
+        chatInput.focus();
+    }
 }
 
 // ===== DATA LOADING =====
@@ -611,169 +621,137 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// ===== CHAT WIDGET =====
 
-class ChatWidget {
-    constructor() {
-        this.sessionId = this.generateSessionId();
-        this.widget = document.getElementById('chat-widget');
-        this.messagesContainer = document.getElementById('chat-messages');
-        this.input = document.getElementById('chat-input');
-        this.sendBtn = document.getElementById('chat-send');
-        this.toggleBtn = document.getElementById('chat-toggle');
-        this.minimizeBtn = document.getElementById('chat-minimize');
-        this.closeBtn = document.getElementById('chat-close');
-        this.status = document.getElementById('chat-status');
-        this.header = document.querySelector('.chat-header');
-        
-        this.isOpen = false;
-        this.isMinimized = false;
-        this.chatAvailable = false;
-        
-        this.init();
-    }
+// ===== AI CHAT FUNCTIONALITY =====
+
+// Initialize chat on page load
+document.addEventListener('DOMContentLoaded', () => {
+    setupChatInterface();
+});
+
+function setupChatInterface() {
+    const chatInput = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('chat-send-btn');
     
-    generateSessionId() {
-        return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-    }
+    if (!chatInput || !sendBtn) return;
     
-    init() {
-        // Check if chat is available
-        this.checkChatAvailability();
-        
-        // Event listeners
-        this.toggleBtn.addEventListener('click', () => this.toggle());
-        this.sendBtn.addEventListener('click', () => this.sendMessage());
-        this.input.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                this.sendMessage();
+    // Send on button click
+    sendBtn.addEventListener('click', () => {
+        const message = chatInput.value.trim();
+        if (message) {
+            sendChatMessage(message);
+            chatInput.value = '';
+            chatInput.focus();
+        }
+    });
+    
+    // Send on Enter key
+    chatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            const message = chatInput.value.trim();
+            if (message) {
+                sendChatMessage(message);
+                chatInput.value = '';
             }
+        }
+    });
+}
+
+async function sendChatMessage(userQuery) {
+    const messagesContainer = document.getElementById('chat-messages');
+    
+    // Add user message to display
+    const userMessageDiv = createChatMessage('user', userQuery);
+    messagesContainer.appendChild(userMessageDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    
+    // Show typing indicator
+    const typingDiv = createChatMessage('bot', '...', true);
+    messagesContainer.appendChild(typingDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    
+    try {
+        // Send to backend
+        const response = await fetch(`${API_BASE}/chat`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ query: userQuery })
         });
-        this.closeBtn.addEventListener('click', () => this.close());
-        this.minimizeBtn.addEventListener('click', () => this.minimize());
-        this.header.addEventListener('click', (e) => {
-            if (!e.target.classList.contains('chat-btn')) {
-                this.minimize();
-            }
-        });
         
-        // Add welcome message
-        this.addMessage('assistant', 'Hi! 👋 I\'m your RUD Assistant. Ask me anything about user risks, recovery actions, or recovery strategies!');
-    }
-    
-    checkChatAvailability() {
-        fetch('/api/health')
-            .then(r => r.json())
-            .then(data => {
-                this.chatAvailable = data.chatbot_ready;
-                if (!this.chatAvailable) {
-                    this.addMessage('system', 'Chat feature unavailable - GROQ API key not configured');
-                }
-            })
-            .catch(() => {
-                this.chatAvailable = false;
-                this.addMessage('system', 'Unable to connect to chat service');
-            });
-    }
-    
-    toggle() {
-        if (this.isOpen) {
-            this.close();
-        } else {
-            this.open();
-        }
-    }
-    
-    open() {
-        this.isOpen = true;
-        this.widget.classList.remove('hidden');
-        this.widget.classList.remove('minimized');
-        this.toggleBtn.classList.add('hidden');
-        this.input.focus();
-    }
-    
-    close() {
-        this.isOpen = false;
-        this.widget.classList.add('hidden');
-        this.toggleBtn.classList.remove('hidden');
-    }
-    
-    minimize() {
-        this.isMinimized = !this.isMinimized;
-        if (this.isMinimized) {
-            this.widget.classList.add('minimized');
-            this.minimizeBtn.textContent = '+';
-        } else {
-            this.widget.classList.remove('minimized');
-            this.minimizeBtn.textContent = '−';
-            this.input.focus();
-        }
-    }
-    
-    async sendMessage() {
-        const message = this.input.value.trim();
-        if (!message) return;
+        const data = await response.json();
         
-        if (!this.chatAvailable) {
-            this.addMessage('system', 'Chat service not available. Please ensure GROQ_API_KEY is set.');
-            return;
-        }
+        // Remove typing indicator
+        typingDiv.remove();
         
-        // Add user message
-        this.addMessage('user', message);
-        this.input.value = '';
-        
-        // Show typing status
-        this.status.classList.add('typing');
-        this.status.textContent = 'AI is thinking';
-        this.sendBtn.classList.add('loading');
-        
-        try {
-            const response = await fetch('/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    message: message,
-                    session_id: this.sessionId
-                })
-            });
+        if (data.success) {
+            // Add bot response
+            const botMessageDiv = createChatMessage('bot', data.response);
             
-            const data = await response.json();
-            
-            if (response.ok) {
-                this.addMessage('assistant', data.response);
-            } else {
-                this.addMessage('system', `Error: ${data.detail || 'Unknown error'}`);
+            // Add SQL query details if available
+            if (data.sql_query) {
+                const detailsDiv = document.createElement('div');
+                detailsDiv.className = 'chat-message-details';
+                detailsDiv.innerHTML = `
+                    <details>
+                        <summary>📋 Generated SQL (${data.row_count} rows)</summary>
+                        <pre><code>${escapeHtml(data.sql_query)}</code></pre>
+                    </details>
+                `;
+                botMessageDiv.appendChild(detailsDiv);
             }
-        } catch (error) {
-            this.addMessage('system', `Connection error: ${error.message}`);
-        } finally {
-            this.status.classList.remove('typing');
-            this.status.textContent = '';
-            this.sendBtn.classList.remove('loading');
+            
+            messagesContainer.appendChild(botMessageDiv);
+        } else {
+            // Add error message
+            const errorDiv = createChatMessage('error', `Error: ${data.error || 'Unknown error'}`);
+            messagesContainer.appendChild(errorDiv);
         }
-    }
-    
-    addMessage(role, content) {
-        const messageEl = document.createElement('div');
-        messageEl.className = `chat-message ${role}`;
         
-        const contentEl = document.createElement('div');
-        contentEl.className = 'chat-message-content';
-        contentEl.textContent = content;
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
         
-        messageEl.appendChild(contentEl);
-        this.messagesContainer.appendChild(messageEl);
+    } catch (error) {
+        console.error('Chat error:', error);
+        typingDiv.remove();
         
-        // Scroll to bottom
-        setTimeout(() => {
-            this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
-        }, 0);
+        const errorDiv = createChatMessage('error', `Connection error: ${error.message}`);
+        messagesContainer.appendChild(errorDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 }
 
-// Initialize chat widget when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-    new ChatWidget();
-});
+function createChatMessage(role, content, isTyping = false) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `chat-message ${role}${isTyping ? ' typing' : ''}`;
+    
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content';
+    
+    if (isTyping) {
+        contentDiv.innerHTML = '<div class="typing-indicator"><span></span><span></span><span></span></div>';
+    } else {
+        contentDiv.textContent = content;
+    }
+    
+    messageDiv.appendChild(contentDiv);
+    
+    const timeDiv = document.createElement('div');
+    timeDiv.className = 'message-time';
+    timeDiv.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    messageDiv.appendChild(timeDiv);
+    
+    return messageDiv;
+}
+
+function escapeHtml(text) {
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, m => map[m]);
+}

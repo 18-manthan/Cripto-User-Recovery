@@ -45,12 +45,14 @@
 "What's the status of user_support_002?"
 💎 High-Value & Priority Users
 "Show me high value users"
-"List high value users with risks"
+"Okay, now what is the motto of this application, and how should we present it to the client?
+
+Please explain how we can pitch it from start to finish, including the features of the project."
 "Which users have the highest recovery potential?"
 "Show me critical priority users"
 "Who are the most valuable users at risk?"
 ⚡ Recovery Actions
-"What recovery actions are pending?"
+"Show me all abandoned users?"
 "Show me all approved recovery actions"
 "List recovery actions for pending approval"
 "How many actions have been executed?"

@@ -1,281 +1,286 @@
-# RUD Demo - High-Value User Recovery Engine
+# RUD (High-Value User Recovery Engine) - AI Chat Feature Documentation
 
-A fully functional demo of the **High-Value User Recovery Engine** with dummy data, interactive dashboard, and working recovery workflow.
+## Overview
 
-## 📋 Project Structure
+This project now includes an **Agentic Chatbot** that allows users to ask natural language questions about the database. The system intelligently converts natural language queries to SQL, executes them, and presents results in a human-readable format.
+
+## Architecture
+
+### System Flow
 
 ```
-demo/
-├── backend/
-│   ├── main.py                 # FastAPI application
-│   ├── models.py              # Canonical data models
-│   ├── dummy_data.py          # Dummy data generator
-│   ├── orchestration.py       # Analysis & recommendation engine
-│   └── requirements.txt        # Python dependencies
-└── frontend/
-    ├── index.html             # Dashboard UI
-    ├── style.css              # Styling
-    └── script.js              # Dashboard logic
+User Query (Natural Language)
+    ↓
+[Groq LLM] - NL to SQL Conversion
+    ↓
+SQL Query Execution (SQLite)
+    ↓
+[Groq LLM] - Results to Natural Language
+    ↓
+User Response (Natural Language)
 ```
 
-## 🚀 Quick Start
+## Components
 
-### 1. Backend Setup
+### Backend (Python/FastAPI)
 
-```bash
-cd backend
+#### 1. **agent.py** - Core Agentic Logic
+The agent module handles all NL↔SQL conversion and database operations.
 
-# Create virtual environment (optional but recommended)
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+**Key Classes:**
+- `RUDAgent`: Main agent class that orchestrates the entire pipeline
+  - `generate_sql()`: Converts natural language to SQL using Groq
+  - `execute_sql()`: Safely executes SQL queries on the database
+  - `format_response()`: Converts query results back to natural language
+  - `query()`: Main orchestration method
 
-# Install dependencies
-pip install -r requirements.txt
+**Features:**
+- Database schema awareness - agent knows all tables and columns
+- SQL safety validation - prevents dangerous operations (DROP, DELETE, etc.)
+- Conversation history tracking - maintains context between queries
+- Error handling and graceful fallbacks
 
-# Run the server
-python3 main.py
+#### 2. **main.py** - FastAPI Integration
+New endpoint added: `POST /api/chat`
+
+**Request Model:**
+```json
+{
+    "query": "natural language question about the database"
+}
 ```
 
-The API will start at `http://localhost:8000`
-
-### 2. Frontend Access
-
-Simply open your browser and navigate to:
-```
-http://localhost:8000
-```
-
-The dashboard will load automatically and display:
-- Real-time system statistics
-- Detected risk flags
-- Recommended recovery actions
-- Recovery scenarios
-- User profiles with detailed insights
-
-## 📊 What's Included
-
-### Dummy Data (50 Users with 4 Scenarios)
-
-1. **Onboarding Dropouts** (10 users)
-   - High-value users stuck in KYC verification
-   - Open support tickets
-   - Recovery focus: Priority support + workflow trigger
-
-2. **Inactive High-Value Users** (15 users)
-   - Users who became inactive after acquisition
-   - No recent activity (>30 days)
-   - Recovery focus: Personalized re-engagement campaigns
-
-3. **Unresolved Support** (5 users)
-   - High-value users with open support tickets
-   - Priority escalation needed
-   - Recovery focus: Ticket escalation + account flagging
-
-4. **Abandoned High-Value** (5 users)
-   - Users with high acquisition cost who disappeared
-   - Valuable recovery opportunities
-   - Recovery focus: Win-back campaigns
-
-### Core Modules Demonstrated
-
-✅ **Connector Layer** - Data ingestion from multiple systems
-✅ **Normalization Layer** - Unified canonical data model
-✅ **Orchestration Engine** - Pattern detection & analysis
-✅ **Policy Layer** - Basic governance rules
-✅ **Execution Layer** - Action approval & execution
-✅ **Operator Interface** - Interactive dashboard
-✅ **Conversion Recovery Engine** - Core use case scenarios
-
-## 🎮 Dashboard Features
-
-### Overview Tab
-- User status distribution
-- Risk severity breakdown
-- Total recovery potential
-- Action execution summary
-
-### Risk Flags Tab
-- Filter by risk type (onboarding, inactivity, support, abandoned)
-- Filter by severity (critical, high, medium, low)
-- View detailed risk descriptions
-- Quick links to user profiles
-
-### Actions Tab
-- View recommended recovery actions
-- Filter by status and priority
-- Approve or execute pending actions
-- See estimated recovery value
-
-### Scenarios Tab
-- Break down by recovery scenario type
-- View affected user count per scenario
-- Total recovery potential per scenario
-- Severity distribution visualization
-
-### Users Tab
-- Search users by ID or email
-- View associated risks and actions
-- Access detailed user profiles with:
-  - Account information
-  - Wallet data
-  - Acquisition campaign details
-  - Active risk flags
-  - Pending actions
-
-## 🔌 API Endpoints
-
-The backend provides the following RESTful API endpoints:
-
-### Dashboard
-- `GET /api/dashboard/stats` - High-level statistics
-- `GET /api/health` - Health check
-
-### Risk Detection
-- `GET /api/risk-flags?flag_type=X&severity=Y&limit=100` - List risk flags
-- `GET /api/scenarios` - Scenario breakdown
-
-### Action Management
-- `GET /api/actions?status=X&priority=Y&limit=100` - List actions
-- `POST /api/actions/{action_id}/approve` - Approve action
-- `POST /api/actions/{action_id}/execute` - Execute action
-
-### Users
-- `GET /api/users/{user_id}` - Detailed user profile
-
-## 📈 Example Workflows
-
-### Workflow 1: Onboarding Recovery
-1. System detects user stuck in KYC for 7+ days
-2. Flags user as HIGH severity with score > 75 (high-value)
-3. Recommends: Priority support + workflow trigger
-4. Operator approves/executes action
-5. Support team receives high-priority ticket assignment
-
-### Workflow 2: Inactive User Recovery
-1. System detects user inactive for 30+ days with score > 70
-2. Calculates CRITICAL severity if score > 85
-3. Recommends: Personalized outreach campaign
-4. Operator approves + schedules email/SMS sequence
-5. Estimated recovery: $1400+ per user
-
-### Workflow 3: Support Escalation
-1. User has 3+ unresolved support tickets
-2. Oldest ticket open > 3 days
-3. Recommends: Escalate + flag as priority customer
-4. Operator executes both actions
-5. System routes to VIP support queue
-
-## 🎯 Key Metrics Calculated
-
-- **High-Value Score**: 0-100 scale based on acquisition source, CPA, activity patterns
-- **Recovery Potential**: Estimated per-user lifetime value = score × multiplier (15-50x depending on scenario)
-- **Scenario Impact**: Total recovery potential per recovery path
-- **Action Priority**: Critical → High → Medium based on urgency + value
-
-## 🔍 Customization
-
-### Adjust Dummy Data
-Edit `backend/dummy_data.py`:
-- Change user counts in `generate_dummy_users()`
-- Modify scoring thresholds
-- Adjust timeframe windows
-- Add new scenarios
-
-### Modify Detection Rules
-Edit `backend/orchestration.py`:
-- Adjust thresholds (e.g., `days_in_onboarding > 7`)
-- Change severity calculations
-- Add new detection engines
-- Modify action recommendations
-
-### Style the Dashboard
-Edit `frontend/style.css` or modify the color scheme:
-```css
---primary: #6366f1;
---danger: #ef4444;
---success: #10b981;
+**Response Model:**
+```json
+{
+    "success": true,
+    "query": "user's original query",
+    "response": "natural language answer",
+    "sql_query": "generated SQL (for reference)",
+    "row_count": 42,
+    "error": null
+}
 ```
 
-## 🧪 Testing the Demo
+### Frontend (HTML/CSS/JavaScript)
 
-### Test Scenario 1: Approve & Execute Actions
-1. Go to "Actions" tab
-2. Click "Approve" on a pending action
-3. Click "Execute" on an approved action
-4. Watch status update in real-time
+#### 1. **Chat UI Panel** (index.html)
+- New "AI Chat" navigation menu item
+- Chat message display area with scrolling
+- Input field with send button
+- Support for markdown and code display
 
-### Test Scenario 2: Search & View Users
-1. Go to "Users" tab
-2. Search for a user ID
-3. Click "View Details"
-4. See complete profile with risks and actions
+#### 2. **Chat JavaScript** (script.js)
+Functions added:
+- `setupChatInterface()`: Initializes chat event listeners
+- `sendChatMessage()`: Sends user query to backend
+- `createChatMessage()`: Renders messages in UI
+- `escapeHtml()`: Prevents XSS attacks
 
-### Test Scenario 3: Filter & Analyze
-1. Go to "Risk Flags" tab
-2. Filter by severity (Critical)
-3. View highest-priority recovery opportunities
-4. Check "Scenarios" tab for impact analysis
+#### 3. **Chat Styling** (style.css)
+- Modern neon-themed chat interface matching the RUD design
+- Animated typing indicator
+- Syntax highlighting for SQL queries
+- Responsive design for mobile
+- Smooth animations and transitions
 
-## 📱 Browser Support
+## Usage
 
-- Chrome/Edge (recommended)
-- Firefox
-- Safari
-- Mobile-responsive design included
+### Setup
 
-## 🛠️ Troubleshooting
+1. **Get Groq API Key**
+   - Visit https://console.groq.com/keys
+   - Create free account
+   - Copy your API key
 
-### Port Already in Use
-```bash
-# Use a different port
-python3 main.py --port 8001
+2. **Configure Environment**
+   - Copy `.env.example` to `.env`
+   - Add your Groq API key:
+     ```
+     GROQ_API_KEY=your_key_here
+     ```
+
+3. **Install Dependencies**
+   ```bash
+   cd backend
+   pip install -r requirements.txt
+   ```
+
+4. **Run the Server**
+   ```bash
+   cd backend
+   python main.py
+   ```
+
+5. **Access Dashboard**
+   - Open http://localhost:8000
+   - Click "AI Chat" in the navigation menu
+
+### Example Queries
+
+The agent can answer various types of queries:
+
+**User Statistics:**
+- "How many users are in onboarding stage?"
+- "Show me all high-value users"
+- "Count users from each country"
+
+**Risk Analysis:**
+- "What are the critical risk flags?"
+- "How many users have unresolved support tickets?"
+- "Show me inactive users with high LTV"
+
+**Recovery Actions:**
+- "Which recovery actions have the highest estimated value?"
+- "List all pending approval actions"
+- "How many actions have been executed?"
+
+**Campaign Performance:**
+- "What's the ROI for each channel?"
+- "Which campaign has the lowest CPA?"
+- "Show me conversions by channel"
+
+**Complex Queries:**
+- "Find high-value users that became inactive in the last 30 days"
+- "Show recovery actions grouped by user lifecycle stage with their total value"
+- "List users with critical risk flags that haven't been contacted yet"
+
+## How It Works
+
+### 1. Query Generation
+```python
+# User asks: "How many critical risk flags are there?"
+# Agent generates:
+SELECT COUNT(*) as count FROM risk_flags WHERE severity = 'critical'
 ```
 
-### Module Not Found
-```bash
-# Ensure all dependencies are installed
-pip install -r requirements.txt
+### 2. SQL Execution
+- Query is validated for safety
+- Executed against SQLite database
+- Results are capped at 1000 rows to prevent huge datasets
 
-# Check Python version (3.8+)
-python3 --version
+### 3. Response Formatting
+```python
+# Raw results: [{"count": 42}]
+# Agent formats to:
+"I found 42 critical risk flags in the system. These represent the highest 
+priority recovery opportunities that require immediate attention."
 ```
 
-### Frontend Not Loading
-- Check browser console for errors (F12)
-- Ensure API is running on localhost:8000
-- Clear browser cache and reload
+## Database Schema Reference
 
-## 📚 Architecture Insights
+The agent has access to the following tables:
 
-The demo showcases:
-- **Non-invasive Integration**: Reads from multiple system APIs
-- **Real-Time Intelligence**: Detects issues as data arrives
-- **Multi-Path Recovery**: Different actions for different scenarios
-- **Approval Workflow**: Prevents unwanted automated actions
-- **Scalable Design**: Cloud-ready architecture
+| Table | Key Columns |
+|-------|------------|
+| **user_profiles** | id, email, name, lifecycle_stage, estimated_ltv, first_seen_at, country |
+| **wallets** | id, user_id, balance_usd, transaction_count, activity_score |
+| **risk_flags** | id, user_id, flag_type, severity, description, days_since_detection |
+| **support_tickets** | id, user_id, subject, status, priority, category, unresolved_days |
+| **recovery_actions** | id, user_id, action_type, status, priority, estimated_recovery_value |
+| **campaigns** | id, campaign_name, channel, spend_usd, conversions, revenue_usd, roi |
 
-## 🎓 Learning Resources
+## Security Considerations
 
-Each module in `backend/`:
-1. **models.py** - Learn canonical entity design
-2. **dummy_data.py** - Understand scenario generation
-3. **orchestration.py** - See pattern detection logic
-4. **main.py** - Explore FastAPI patterns
+### Query Safety
+- Only SELECT operations are permitted
+- Prevents: DROP, DELETE, INSERT, UPDATE, CREATE, ALTER
+- Queries are validated before execution
 
-Dashboard (`frontend/`):
-- Real-time data loading
-- Interactive filtering
-- Modal patterns
-- Responsive design
+### API Key Protection
+- Groq API key stored in environment variables
+- Never transmitted to frontend
+- All LLM calls happen server-side
 
-## 📞 Next Steps
+### Data Privacy
+- Results limited to 1000 rows
+- No sensitive data exposed in error messages
+- Chat history only stored in memory per session
 
-1. **Customize for your use case** - Modify dummy data to match your business
-2. **Connect real data sources** - Replace dummy_data.py with actual API integrations
-3. **Extend detection rules** - Add more sophisticated pattern detection
-4. **Implement approval workflow** - Connect to your approval system
-5. **Action execution** - Integrate with your action systems
+## Advanced Features
 
-## 📄 License
+### 1. Conversation Context
+The agent maintains conversation history, allowing follow-up questions:
+- User: "Show me critical risk flags"
+- Agent: [displays results]
+- User: "How many are from inactive users?"
+- Agent: [understands context from previous query]
 
-Demo created for client presentation purposes.
+### 2. SQL Query Reference
+Every chat response displays the generated SQL query in a collapsible section, allowing operators to:
+- Verify the agent's logic
+- Learn SQL patterns
+- Create custom reports based on agent queries
+
+### 3. Error Handling
+- Graceful fallbacks if LLM fails
+- Clear error messages
+- Automatic retry mechanisms
+
+## Troubleshooting
+
+### "GROQ_API_KEY not found"
+- Ensure `.env` file exists in backend directory
+- Set `GROQ_API_KEY` environment variable
+- Restart the server
+
+### "Connection error to Groq"
+- Check internet connection
+- Verify API key is valid
+- Check Groq service status
+
+### Agent generates invalid SQL
+- Try rephrasing the question
+- Use more specific field names
+- Ask simpler questions first
+
+### No results returned
+- Agent may have generated correct SQL that returns 0 rows
+- Check if data exists for your query
+- Try broader queries first
+
+## Model Used
+
+The chatbot uses Groq's **Mixtral-8x7b-32768** model:
+- **Speed**: ~80 tokens/sec (very fast)
+- **Context**: 32,768 tokens
+- **Cost**: Free tier available
+- **Performance**: Excellent for SQL generation and text processing
+
+## Future Enhancements
+
+Potential additions to the chat system:
+
+1. **Data Visualization**: Generate charts from query results
+2. **Scheduled Reports**: "Show me critical risks every Monday"
+3. **Multi-turn Analysis**: Deeper exploration of specific user cohorts
+4. **Custom Alerts**: "Notify me when X happens"
+5. **Natural Language Explanations**: More detailed business insights
+6. **Query Templates**: Save and reuse common queries
+7. **Export Functionality**: Download results as CSV/PDF
+8. **Analytics**: Track popular queries and insights
+
+## Performance Notes
+
+- Initial query: 2-5 seconds (includes LLM processing)
+- Subsequent queries: 1-3 seconds (faster cold start)
+- Response time depends on:
+  - Database query complexity
+  - Groq API latency
+  - Result set size
+
+## Support and Debugging
+
+Enable verbose logging in `agent.py`:
+```python
+# Change in agent.py
+echo=True  # Set to True in create_engine()
+```
+
+This will print all SQL queries being executed, helping identify issues.
+
+---
+
+**Built with**: FastAPI, Groq LLM, SQLAlchemy, JavaScript
+**Version**: 1.0.0
+**Last Updated**: April 2, 2026
