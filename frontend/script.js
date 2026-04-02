@@ -1,5 +1,6 @@
 // ===== API BASE URL =====
 const API_BASE = 'http://localhost:8000/api';
+const AUTH_TOKEN_KEY = 'rud_admin_token';
 
 // ===== STATE =====
 let appState = {
@@ -12,26 +13,120 @@ let appState = {
     filteredActions: [],
     filteredUsers: []
 };
+let isChatInitialized = false;
 
 // ===== INITIALIZATION =====
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('🚀 RUD Demo Dashboard loading...');
-    
-    // Setup navigation
+
+    setupAuth();
     setupNavigation();
-    
-    // Setup filters
     setupFilters();
-    
-    // Load data
-    await loadDashboardData();
-    
-    // Render initial view
-    renderOverview();
-    
-    // Update status
-    updateHealthStatus();
+    setupChatInterface();
+
+    if (isAuthenticated()) {
+        showApp();
+        await initializeApp();
+    } else {
+        showLogin();
+    }
 });
+
+function getAuthToken() {
+    return localStorage.getItem(AUTH_TOKEN_KEY) || '';
+}
+
+function isAuthenticated() {
+    return Boolean(getAuthToken());
+}
+
+function showLogin(errorMessage = '') {
+    document.getElementById('login-screen')?.classList.remove('auth-hidden');
+    document.getElementById('app-shell')?.classList.add('app-hidden');
+    const errorEl = document.getElementById('login-error');
+    if (errorEl) errorEl.textContent = errorMessage;
+}
+
+function showApp() {
+    document.getElementById('login-screen')?.classList.add('auth-hidden');
+    document.getElementById('app-shell')?.classList.remove('app-hidden');
+}
+
+function clearSession() {
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+}
+
+function setupAuth() {
+    const loginForm = document.getElementById('login-form');
+    const logoutBtn = document.getElementById('logout-btn');
+
+    loginForm?.addEventListener('submit', handleLogin);
+    logoutBtn?.addEventListener('click', handleLogout);
+}
+
+async function handleLogin(event) {
+    event.preventDefault();
+
+    const email = document.getElementById('login-email')?.value.trim() || '';
+    const password = document.getElementById('login-password')?.value || '';
+    const errorEl = document.getElementById('login-error');
+    const submitBtn = event.currentTarget.querySelector('button[type="submit"]');
+
+    if (errorEl) errorEl.textContent = '';
+    if (submitBtn) submitBtn.disabled = true;
+
+    try {
+        const response = await fetch(`${API_BASE}/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.success || !data.token) {
+            throw new Error(data.error || 'Login failed');
+        }
+
+        localStorage.setItem(AUTH_TOKEN_KEY, data.token);
+        showApp();
+        await initializeApp();
+    } catch (error) {
+        if (errorEl) errorEl.textContent = error.message || 'Login failed';
+    } finally {
+        if (submitBtn) submitBtn.disabled = false;
+    }
+}
+
+function handleLogout() {
+    clearSession();
+    showLogin();
+}
+
+async function initializeApp() {
+    await loadDashboardData();
+    renderOverview();
+    updateHealthStatus();
+}
+
+async function apiFetch(url, options = {}) {
+    const headers = {
+        ...(options.headers || {})
+    };
+
+    const token = getAuthToken();
+    if (token) {
+        headers['X-Auth-Token'] = token;
+    }
+
+    const response = await fetch(url, { ...options, headers });
+    if (response.status === 401) {
+        clearSession();
+        showLogin('Your session has ended. Please sign in again.');
+        throw new Error('Unauthorized');
+    }
+
+    return response;
+}
 
 // ===== NAVIGATION =====
 function setupNavigation() {
@@ -71,10 +166,10 @@ async function loadDashboardData() {
     try {
         // Load all data in parallel
         const [statsRes, risksRes, actionsRes, scenariosRes] = await Promise.all([
-            fetch(`${API_BASE}/dashboard/stats`),
-            fetch(`${API_BASE}/risk-flags?limit=1000`),
-            fetch(`${API_BASE}/actions?limit=1000`),
-            fetch(`${API_BASE}/scenarios`)
+            apiFetch(`${API_BASE}/dashboard/stats`),
+            apiFetch(`${API_BASE}/risk-flags?limit=1000`),
+            apiFetch(`${API_BASE}/actions?limit=1000`),
+            apiFetch(`${API_BASE}/scenarios`)
         ]);
         
         appState.stats = await statsRes.json();
@@ -108,7 +203,7 @@ function loadUsers() {
 
 async function updateHealthStatus() {
     try {
-        const response = await fetch(`${API_BASE}/health`);
+        const response = await apiFetch(`${API_BASE}/health`);
         const data = await response.json();
         
         const indicator = document.getElementById('status-indicator');
@@ -445,7 +540,7 @@ function filterUsers() {
 // ===== ACTIONS =====
 async function approveAction(actionId) {
     try {
-        const response = await fetch(`${API_BASE}/actions/${actionId}/approve`, {
+        const response = await apiFetch(`${API_BASE}/actions/${actionId}/approve`, {
             method: 'POST'
         });
         const data = await response.json();
@@ -462,7 +557,7 @@ async function approveAction(actionId) {
 
 async function executeAction(actionId) {
     try {
-        const response = await fetch(`${API_BASE}/actions/${actionId}/execute`, {
+        const response = await apiFetch(`${API_BASE}/actions/${actionId}/execute`, {
             method: 'POST'
         });
         const data = await response.json();
@@ -479,7 +574,7 @@ async function executeAction(actionId) {
 
 async function viewUserDetail(userId) {
     try {
-        const response = await fetch(`${API_BASE}/users/${userId}`);
+        const response = await apiFetch(`${API_BASE}/users/${userId}`);
         const data = await response.json();
         
         if (data.error) {
@@ -624,12 +719,9 @@ document.addEventListener('click', (e) => {
 
 // ===== AI CHAT FUNCTIONALITY =====
 
-// Initialize chat on page load
-document.addEventListener('DOMContentLoaded', () => {
-    setupChatInterface();
-});
-
 function setupChatInterface() {
+    if (isChatInitialized) return;
+
     const chatInput = document.getElementById('chat-input');
     const sendBtn = document.getElementById('chat-send-btn');
     
@@ -656,6 +748,8 @@ function setupChatInterface() {
             }
         }
     });
+
+    isChatInitialized = true;
 }
 
 async function sendChatMessage(userQuery) {
@@ -673,7 +767,7 @@ async function sendChatMessage(userQuery) {
     
     try {
         // Send to backend
-        const response = await fetch(`${API_BASE}/chat`, {
+        const response = await apiFetch(`${API_BASE}/chat`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

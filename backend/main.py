@@ -2,7 +2,7 @@
 FastAPI Backend for RUD Demo
 Provides API endpoints for the operator dashboard
 """
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -32,6 +32,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+ADMIN_EMAIL = "admin@cisinlabs.com"
+ADMIN_PASSWORD = "cisin@321!"
+ACTIVE_TOKENS = set()
+
 
 # ==================== PYDANTIC MODELS ====================
 
@@ -56,6 +60,25 @@ class ChatResponse(BaseModel):
     row_count: Optional[int] = None
     error: Optional[str] = None
 
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class LoginResponse(BaseModel):
+    success: bool
+    token: Optional[str] = None
+    user: Optional[str] = None
+    error: Optional[str] = None
+
+
+def require_auth(x_auth_token: Optional[str] = Header(None)):
+    """Simple token-based auth for the demo dashboard."""
+    if not x_auth_token or x_auth_token not in ACTIVE_TOKENS:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return x_auth_token
+
 @app.on_event("startup")
 async def startup_event():
     """Initialize the demo system with database"""
@@ -79,8 +102,19 @@ async def startup_event():
 
 # ==================== AGENTIC CHAT API ====================
 
+@app.post("/api/login", response_model=LoginResponse)
+async def login(request: LoginRequest):
+    """Demo login endpoint for the dashboard."""
+    if request.email == ADMIN_EMAIL and request.password == ADMIN_PASSWORD:
+        token = str(uuid.uuid4())
+        ACTIVE_TOKENS.add(token)
+        return LoginResponse(success=True, token=token, user=ADMIN_EMAIL)
+
+    return LoginResponse(success=False, error="Invalid email or password")
+
+
 @app.post("/api/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, _: str = Depends(require_auth)):
     """Chat endpoint for natural language queries about the database
     
     Example queries:
@@ -112,7 +146,7 @@ async def chat(request: ChatRequest):
 # ==================== DASHBOARD API ====================
 
 @app.get("/api/dashboard/stats")
-async def get_dashboard_stats():
+async def get_dashboard_stats(_: str = Depends(require_auth)):
     """Get high-level dashboard statistics"""
     db = SessionLocal()
     try:
@@ -168,7 +202,8 @@ async def get_risk_flags(
     flag_type: str = None,
     severity: str = None,
     limit: int = 100,
-    offset: int = 0
+    offset: int = 0,
+    _: str = Depends(require_auth)
 ):
     """Get detected risk flags with optional filtering"""
     db = SessionLocal()
@@ -210,7 +245,8 @@ async def get_actions(
     status: str = None,
     priority: str = None,
     limit: int = 100,
-    offset: int = 0
+    offset: int = 0,
+    _: str = Depends(require_auth)
 ):
     """Get recommended actions with optional filtering"""
     db = SessionLocal()
@@ -249,7 +285,7 @@ async def get_actions(
 
 
 @app.post("/api/actions/{action_id}/approve")
-async def approve_action(action_id: str):
+async def approve_action(action_id: str, _: str = Depends(require_auth)):
     """Approve a pending action"""
     db = SessionLocal()
     try:
@@ -272,7 +308,7 @@ async def approve_action(action_id: str):
 
 
 @app.post("/api/actions/{action_id}/execute")
-async def execute_action(action_id: str):
+async def execute_action(action_id: str, _: str = Depends(require_auth)):
     """Execute an approved action"""
     db = SessionLocal()
     try:
@@ -297,7 +333,7 @@ async def execute_action(action_id: str):
 
 
 @app.get("/api/users/{user_id}")
-async def get_user_details(user_id: str):
+async def get_user_details(user_id: str, _: str = Depends(require_auth)):
     """Get detailed user profile with related data"""
     db = SessionLocal()
     try:
@@ -368,7 +404,7 @@ async def get_user_details(user_id: str):
 
 
 @app.get("/api/scenarios")
-async def get_scenario_breakdown():
+async def get_scenario_breakdown(_: str = Depends(require_auth)):
     """Get breakdown of recovery scenarios by risk type"""
     db = SessionLocal()
     try:

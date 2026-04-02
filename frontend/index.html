@@ -11,7 +11,34 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
+    <div id="login-screen" class="auth-screen">
+        <div class="auth-card">
+            <div class="auth-brand">
+                <span class="brand-logo-shell auth-logo-shell">
+                    <img src="assets/crypto-logo.svg" alt="RUD crypto logo" class="brand-logo">
+                </span>
+                <div class="auth-copy">
+                    <h1>Admin Access</h1>
+                    <p>Sign in to access the High-Value User Recovery Engine dashboard.</p>
+                </div>
+            </div>
+
+            <form id="login-form" class="auth-form">
+                <label class="auth-field">
+                    <span>Email</span>
+                    <input type="email" id="login-email" class="auth-input" placeholder="admin@cisinlabs.com" autocomplete="username" required>
+                </label>
+                <label class="auth-field">
+                    <span>Password</span>
+                    <input type="password" id="login-password" class="auth-input" placeholder="Enter password" autocomplete="current-password" required>
+                </label>
+                <p id="login-error" class="auth-error" aria-live="polite"></p>
+                <button type="submit" class="auth-submit">Sign In</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="app-shell" class="container app-shell app-hidden">
         <!-- Header -->
         <header class="header">
             <div class="header-content">
@@ -27,6 +54,7 @@
                 <span id="status-indicator" class="status-dot loading"></span>
                 <span id="status-text">Initializing...</span>
             </div>
+            <button id="logout-btn" class="logout-btn" type="button">Logout</button>
         </header>
 
         <!-- Dashboard Stats -->
