@@ -6,6 +6,7 @@ Uses Groq LLM for intelligent query generation and response formatting
 import os
 import json
 import logging
+import re
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 from groq import Groq
@@ -114,6 +115,75 @@ class RUDAgent:
     def __init__(self):
         self.client = client
         self.db = SessionLocal()
+        self.allowed_keywords = {
+            "user", "users", "profile", "profiles", "wallet", "wallets", "risk", "risks",
+            "flag", "flags", "severity", "support", "ticket", "tickets", "recovery",
+            "action", "actions", "campaign", "campaigns", "revenue", "spend", "roi",
+            "ltv", "value", "high_value", "high-value", "inactive", "churned", "active",
+            "onboarding", "critical", "high", "medium", "low", "pending", "approved",
+            "executed", "failed", "kyc", "withdrawal", "login", "compliance", "database",
+            "data", "sql", "count", "list", "show", "find", "which", "who", "how", "total",
+            "average", "avg", "breakdown", "summary", "status", "stages", "country",
+            "acquisition", "source", "sources", "potential", "users", "records"
+        }
+        self.blocked_patterns = [
+            r"\bcapital\b",
+            r"\bweather\b",
+            r"\bnews\b",
+            r"\bmovie\b",
+            r"\bsong\b",
+            r"\bcricket\b",
+            r"\bfootball\b",
+            r"\bpolitics\b",
+            r"\bwho is\b",
+            r"\bwhat is\b.*\b(country|india|delhi|world|planet)\b",
+        ]
+        self.abuse_markers = {
+            "chutiya", "chutiyaa", "madarchod", "bhosdike", "idiot", "stupid",
+            "dumb", "useless", "fuck", "fucking", "shit", "bitch", "asshole"
+        }
+
+    def _safe_text_response(self, user_query: str, text_response: str) -> Dict[str, Any]:
+        """Return a safe non-tabular response payload for chat."""
+        return {
+            "success": True,
+            "query": user_query,
+            "row_count": 0,
+            "response": json.dumps({"text": text_response, "data": []}, default=str),
+            "context": text_response
+        }
+
+    def _normalize_query(self, user_query: str) -> str:
+        return re.sub(r"\s+", " ", user_query.lower()).strip()
+
+    def _tokenize_query(self, user_query: str) -> List[str]:
+        return re.findall(r"[a-zA-Z_]+(?:-[a-zA-Z_]+)?", user_query.lower())
+
+    def is_abusive(self, user_query: str) -> bool:
+        """Check whether the message is abusive or insulting."""
+        normalized = self._normalize_query(user_query)
+        return any(marker in normalized for marker in self.abuse_markers)
+
+    def is_relevant_data_query(self, user_query: str) -> bool:
+        """Allow only RUD/data-oriented questions through to SQL generation."""
+        normalized = self._normalize_query(user_query)
+        tokens = set(self._tokenize_query(normalized))
+
+        if any(re.search(pattern, normalized) for pattern in self.blocked_patterns):
+            return False
+
+        if not tokens:
+            return False
+
+        if any(token in self.allowed_keywords for token in tokens):
+            return True
+
+        id_like_match = re.search(r"\b(user|account|investor)_[a-z0-9_]+\b", normalized)
+        email_like_match = re.search(r"\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b", normalized)
+        if id_like_match or email_like_match:
+            return True
+
+        return False
 
     def _extract_sql_and_explanation(self, response_text: str) -> Dict[str, Any]:
         """Extract SQL and explanation from model output."""
@@ -371,7 +441,7 @@ If possible, restate what the user is asking about in business language and sugg
     def is_greeting_or_meta(self, user_query: str) -> Optional[Dict[str, Any]]:
         """Check if query is a greeting or meta-question that doesn't need database query"""
         
-        query_lower = user_query.lower().strip()
+        query_lower = self._normalize_query(user_query)
         
         # Greetings and meta questions
         greeting_responses = {
@@ -392,16 +462,29 @@ If possible, restate what the user is asking about in business language and sugg
         
         # Check for exact matches (for common greetings)
         for trigger, response in greeting_responses.items():
-            if trigger in query_lower:
-                return {
-                    "success": True,
-                    "query": user_query,
-                    "response": response,  # Return the greeting message as response
-                    "context": response,
-                    "row_count": 0,
-                    "is_meta": True
-                }
+            if query_lower == trigger:
+                meta_payload = self._safe_text_response(user_query, response)
+                meta_payload["is_meta"] = True
+                return meta_payload
         
+        return None
+
+    def handle_guardrails(self, user_query: str) -> Optional[Dict[str, Any]]:
+        """Return a safe response for abusive or off-topic queries."""
+        normalized = self._normalize_query(user_query)
+
+        if self.is_abusive(normalized):
+            return self._safe_text_response(
+                user_query,
+                "I can help with RUD dashboard questions, but I can’t assist with abusive messages. Ask me about users, risk flags, recovery actions, support tickets, or campaign metrics."
+            )
+
+        if not self.is_relevant_data_query(normalized):
+            return self._safe_text_response(
+                user_query,
+                "I’m focused only on your RUD data and recovery dashboard. Ask me about users, wallets, risk flags, support tickets, recovery actions, campaigns, or metrics like high-value users and critical priorities."
+            )
+
         return None
     
     def query(self, user_query: str) -> Dict[str, Any]:
@@ -411,6 +494,11 @@ If possible, restate what the user is asking about in business language and sugg
         meta_response = self.is_greeting_or_meta(user_query)
         if meta_response:
             return meta_response
+
+        # Step 0.5: Apply topic and behavior guardrails before SQL generation
+        guardrail_response = self.handle_guardrails(user_query)
+        if guardrail_response:
+            return guardrail_response
         
         # Step 1: Generate SQL
         sql_result = self.generate_sql(user_query)
