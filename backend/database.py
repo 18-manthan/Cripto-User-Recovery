@@ -7,15 +7,24 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from models import Base
 
-# Use SQLite database in the backend directory
-DATABASE_URL = "sqlite:///./rud_demo.db"
+# Get database URL from environment or use default SQLite
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./rud_demo.db")
 
-# Create engine with SQLite-specific settings
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False},  # SQLite-specific
-    echo=False  # Set to True for SQL debugging
-)
+# Create engine based on database type
+if DATABASE_URL.startswith("sqlite"):
+    # SQLite-specific settings
+    engine = create_engine(
+        DATABASE_URL,
+        connect_args={"check_same_thread": False},
+        echo=False
+    )
+else:
+    # PostgreSQL or other database (production)
+    engine = create_engine(
+        DATABASE_URL,
+        echo=False,
+        pool_pre_ping=True  # Test connections before using them
+    )
 
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
