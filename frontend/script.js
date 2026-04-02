@@ -687,21 +687,54 @@ async function sendChatMessage(userQuery) {
         typingDiv.remove();
         
         if (data.success) {
-            // Add bot response
-            const botMessageDiv = createChatMessage('bot', data.response);
+            // Create bot message container
+            const botMessageDiv = document.createElement('div');
+            botMessageDiv.className = 'chat-message bot';
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            
+            // Build the full response with context and formatted data
+            let fullContent = '';
+            
+            // Parse and format the response
+            try {
+                const responseData = JSON.parse(data.response);
+                
+                // Check if response has the new format with text and data
+                if (responseData.text && responseData.data !== undefined) {
+                    // New format: combined text + data
+                    fullContent += `<p class="chat-response-context">${escapeHtml(responseData.text)}</p>`;
+                    
+                    // If there's table data, format it
+                    if (Array.isArray(responseData.data) && responseData.data.length > 0) {
+                        const formattedContent = formatJsonResponse(responseData.data, data.row_count || 0);
+                        fullContent += formattedContent;
+                    }
+                } else if (Array.isArray(responseData)) {
+                    // Old format: just array of data
+                    if (data.context) {
+                        fullContent += `<p class="chat-response-context">${escapeHtml(data.context)}</p>`;
+                    }
+                    const formattedContent = formatJsonResponse(responseData, data.row_count || 0);
+                    fullContent += formattedContent;
+                } else {
+                    // Object but not our new format
+                    if (data.context) {
+                        fullContent += `<p class="chat-response-context">${escapeHtml(data.context)}</p>`;
+                    }
+                    const formattedContent = formatJsonResponse(responseData, data.row_count || 0);
+                    fullContent += formattedContent;
+                }
+            } catch (e) {
+                // If not JSON, use response as plain text
+                fullContent += `<p class="chat-response-text">${escapeHtml(data.response)}</p>`;
+            }
+            
+            contentDiv.innerHTML = fullContent;
+            botMessageDiv.appendChild(contentDiv);
             
             // Add SQL query details if available
-            if (data.sql_query) {
-                const detailsDiv = document.createElement('div');
-                detailsDiv.className = 'chat-message-details';
-                detailsDiv.innerHTML = `
-                    <details>
-                        <summary>📋 Generated SQL (${data.row_count} rows)</summary>
-                        <pre><code>${escapeHtml(data.sql_query)}</code></pre>
-                    </details>
-                `;
-                botMessageDiv.appendChild(detailsDiv);
-            }
             
             messagesContainer.appendChild(botMessageDiv);
         } else {
@@ -722,6 +755,237 @@ async function sendChatMessage(userQuery) {
     }
 }
 
+function formatJsonResponse(data, rowCount) {
+    if (!Array.isArray(data) || data.length === 0) {
+        return `<p class="chat-response-text">No results found</p>`;
+    }
+    
+    // Check if it's a single count/aggregate result
+    if (data.length === 1 && Object.keys(data[0]).length === 1) {
+        const key = Object.keys(data[0])[0];
+        const value = data[0][key];
+        return `<p class="chat-response-text"><strong>Result:</strong> ${formatValue(value)}</p>`;
+    }
+    
+    // For small result sets (≤5 rows), show as table
+    if (data.length <= 5) {
+        return formatAsTable(data);
+    }
+    
+    // For larger result sets (>5 rows), show summary with pagination
+    return formatAsSummary(data, rowCount);
+}
+
+function formatAsTable(data) {
+    if (!data || data.length === 0) return '';
+    
+    const keys = Object.keys(data[0]);
+    
+    let html = '<div class="chat-response-table-wrapper"><table class="chat-response-table"><thead><tr>';
+    
+    // Header
+    keys.forEach(key => {
+        html += `<th>${escapeHtml(key)}</th>`;
+    });
+    html += '</tr></thead><tbody>';
+    
+    // Rows - show all rows for data <= 5
+    data.forEach(row => {
+        html += '<tr>';
+        keys.forEach(key => {
+            const value = formatValue(row[key]);
+            html += `<td>${escapeHtml(value)}</td>`;
+        });
+        html += '</tr>';
+    });
+    
+    html += '</tbody></table></div>';
+    
+    return html;
+}
+
+function formatAsSummary(data, rowCount) {
+    if (!data || data.length === 0) return '';
+    
+    const keys = Object.keys(data[0]);
+    const itemsPerPage = 5;
+    const totalPages = Math.ceil(data.length / itemsPerPage);
+    
+    // Store pagination data globally for this response
+    const paginationId = 'pagination_' + Date.now();
+    window.chatPagination = window.chatPagination || {};
+    window.chatPagination[paginationId] = {
+        data: data,
+        keys: keys,
+        currentPage: 1,
+        itemsPerPage: itemsPerPage,
+        totalPages: totalPages,
+        totalRecords: rowCount
+    };
+    
+    let html = `<p class="chat-response-summary"><strong>Found ${rowCount} record(s)</strong></p>`;
+    
+    // Initial table with first page
+    const startIdx = 0;
+    const endIdx = Math.min(itemsPerPage, data.length);
+    const pageData = data.slice(startIdx, endIdx);
+    
+    html += `<div class="chat-response-pagination-info">Showing ${startIdx + 1}-${endIdx} of ${rowCount} records</div>`;
+    
+    // Show table for current page
+    html += `<div class="chat-response-table-wrapper" id="table-${paginationId}"><table class="chat-response-table"><thead><tr>`;
+    
+    keys.forEach(key => {
+        html += `<th>${escapeHtml(key)}</th>`;
+    });
+    html += '</tr></thead><tbody>';
+    
+    pageData.forEach(row => {
+        html += '<tr>';
+        keys.forEach(key => {
+            const value = formatValue(row[key]);
+            const truncated = value.length > 50 ? value.substring(0, 47) + '...' : value;
+            html += `<td title="${escapeHtml(value)}">${escapeHtml(truncated)}</td>`;
+        });
+        html += '</tr>';
+    });
+    
+    html += '</tbody></table></div>';
+    
+    // Pagination controls
+    if (totalPages > 1) {
+        html += `<div class="chat-response-pagination">`;
+        
+        // Previous button
+        html += `<button class="chat-pagination-btn" onclick="goToChatPage('${paginationId}', 0)" ${totalPages <= 1 ? 'disabled' : ''}>← Previous</button>`;
+        
+        // Page info
+        html += `<span class="chat-pagination-info"><span id="current-page-${paginationId}">1</span>/${totalPages}</span>`;
+        
+        // Next button
+        html += `<button class="chat-pagination-btn" onclick="goToChatPage('${paginationId}', 2)">Next →</button>`;
+        
+        // Show all button
+        html += `<button class="chat-pagination-btn chat-pagination-btn-primary" onclick="showAllChatResults('${paginationId}')">Show All ${rowCount}</button>`;
+        
+        html += `</div>`;
+    }
+    
+    return html;
+}
+
+function goToChatPage(paginationId, direction) {
+    const pagination = window.chatPagination[paginationId];
+    if (!pagination) return;
+    
+    let newPage = pagination.currentPage;
+    if (direction === 0) {
+        newPage = Math.max(1, newPage - 1);
+    } else if (direction === 2) {
+        newPage = Math.min(pagination.totalPages, newPage + 1);
+    }
+    
+    if (newPage === pagination.currentPage) return;
+    
+    pagination.currentPage = newPage;
+    const startIdx = (newPage - 1) * pagination.itemsPerPage;
+    const endIdx = Math.min(startIdx + pagination.itemsPerPage, pagination.data.length);
+    const pageData = pagination.data.slice(startIdx, endIdx);
+    
+    // Update table
+    const tableWrapper = document.getElementById('table-' + paginationId);
+    let html = `<table class="chat-response-table"><thead><tr>`;
+    
+    pagination.keys.forEach(key => {
+        html += `<th>${escapeHtml(key)}</th>`;
+    });
+    html += '</tr></thead><tbody>';
+    
+    pageData.forEach(row => {
+        html += '<tr>';
+        pagination.keys.forEach(key => {
+            const value = formatValue(row[key]);
+            const truncated = value.length > 50 ? value.substring(0, 47) + '...' : value;
+            html += `<td title="${escapeHtml(value)}">${escapeHtml(truncated)}</td>`;
+        });
+        html += '</tr>';
+    });
+    
+    html += '</tbody></table>';
+    tableWrapper.innerHTML = html;
+    
+    // Update page info
+    document.getElementById('current-page-' + paginationId).textContent = newPage;
+    
+    // Update pagination text
+    const paginationInfoEl = tableWrapper.parentElement.querySelector('.chat-response-pagination-info');
+    if (paginationInfoEl) {
+        paginationInfoEl.textContent = `Showing ${startIdx + 1}-${endIdx} of ${pagination.totalRecords} records`;
+    }
+    
+    // Scroll to table
+    tableWrapper.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function showAllChatResults(paginationId) {
+    const pagination = window.chatPagination[paginationId];
+    if (!pagination) return;
+    
+    // Update table to show all
+    const tableWrapper = document.getElementById('table-' + paginationId);
+    let html = `<table class="chat-response-table"><thead><tr>`;
+    
+    pagination.keys.forEach(key => {
+        html += `<th>${escapeHtml(key)}</th>`;
+    });
+    html += '</tr></thead><tbody>';
+    
+    pagination.data.forEach(row => {
+        html += '<tr>';
+        pagination.keys.forEach(key => {
+            const value = formatValue(row[key]);
+            const truncated = value.length > 50 ? value.substring(0, 47) + '...' : value;
+            html += `<td title="${escapeHtml(value)}">${escapeHtml(truncated)}</td>`;
+        });
+        html += '</tr>';
+    });
+    
+    html += '</tbody></table>';
+    tableWrapper.innerHTML = html;
+    
+    // Hide pagination controls
+    const paginationControls = tableWrapper.parentElement.querySelector('.chat-response-pagination');
+    if (paginationControls) {
+        paginationControls.style.display = 'none';
+    }
+    
+    // Update info
+    const paginationInfoEl = tableWrapper.parentElement.querySelector('.chat-response-pagination-info');
+    if (paginationInfoEl) {
+        paginationInfoEl.textContent = `Showing all ${pagination.totalRecords} records`;
+    }
+}
+
+function formatValue(value) {
+    if (value === null || value === undefined) {
+        return '—';
+    }
+    if (typeof value === 'number') {
+        // Format currency if it looks like money
+        if (value > 1000 && value.toString().includes('.')) {
+            return `$${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+        }
+        return value.toLocaleString();
+    }
+    if (typeof value === 'boolean') {
+        return value ? '✓' : '✗';
+    }
+    if (typeof value === 'object') {
+        return JSON.stringify(value);
+    }
+    return String(value);
+}
+
 function createChatMessage(role, content, isTyping = false) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `chat-message ${role}${isTyping ? ' typing' : ''}`;
@@ -731,8 +995,15 @@ function createChatMessage(role, content, isTyping = false) {
     
     if (isTyping) {
         contentDiv.innerHTML = '<div class="typing-indicator"><span></span><span></span><span></span></div>';
+    } else if (typeof content === 'string') {
+        // Check if content looks like HTML (starts with <)
+        if (content.trim().startsWith('<')) {
+            contentDiv.innerHTML = content;
+        } else {
+            contentDiv.textContent = content;
+        }
     } else {
-        contentDiv.textContent = content;
+        contentDiv.textContent = String(content);
     }
     
     messageDiv.appendChild(contentDiv);
