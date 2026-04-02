@@ -1,5 +1,5 @@
 // ===== API BASE URL =====
-const API_BASE = 'http://localhost:8000/api';
+const API_BASE = 'https://rud-backend.onrender.com/api';
 const AUTH_TOKEN_KEY = 'rud_admin_token';
 
 // ===== STATE =====
