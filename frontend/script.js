@@ -167,13 +167,13 @@ function renderUserStatusChart() {
     for (const [status, count] of Object.entries(data)) {
         const percentage = (count / appState.stats.total_users * 100).toFixed(1);
         html += `
-            <div style="margin-bottom: 1rem;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                    <span style="text-transform: capitalize; font-weight: 500;">${status}</span>
-                    <span>${count} (${percentage}%)</span>
-                </div>
-                <div style="height: 8px; background: var(--bg-tertiary); border-radius: 4px; overflow: hidden;">
-                    <div style="height: 100%; width: ${percentage}%; background: var(--primary); border-radius: 4px;"></div>
+            <div style="margin-bottom: 1.5rem;">
+                <div style="display: grid; grid-template-columns: 150px 1fr 120px; gap: 1rem; align-items: center; margin-bottom: 0.7rem;">
+                    <span style="text-transform: capitalize; font-weight: 600; color: var(--primary);">${status}</span>
+                    <div style="height: 8px; background: var(--bg-tertiary); border-radius: 4px; overflow: hidden;">
+                        <div style="height: 100%; width: ${percentage}%; background: var(--primary); border-radius: 4px; box-shadow: 0 0 8px rgba(0, 255, 65, 0.4);"></div>
+                    </div>
+                    <span style="text-align: right; font-weight: 600; color: var(--text-secondary);">${count} (${percentage}%)</span>
                 </div>
             </div>
         `;
@@ -188,10 +188,10 @@ function renderSeverityChart() {
     
     const severityOrder = ['critical', 'high', 'medium', 'low'];
     const colorMap = {
-        critical: '#dc2626',
-        high: '#ef4444',
-        medium: '#f59e0b',
-        low: '#10b981'
+        critical: '#ff0040',
+        high: '#ff006e',
+        medium: '#00d9ff',
+        low: '#00ff41'
     };
     
     let html = '<div style="padding: 1rem;">';
@@ -201,13 +201,13 @@ function renderSeverityChart() {
         const percentage = total > 0 ? (count / total * 100).toFixed(1) : 0;
         
         html += `
-            <div style="margin-bottom: 1rem;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                    <span style="text-transform: capitalize; font-weight: 500;">${severity}</span>
-                    <span>${count} flags</span>
-                </div>
-                <div style="height: 8px; background: var(--bg-tertiary); border-radius: 4px; overflow: hidden;">
-                    <div style="height: 100%; width: ${percentage}%; background: ${colorMap[severity]}; border-radius: 4px;"></div>
+            <div style="margin-bottom: 1.5rem;">
+                <div style="display: grid; grid-template-columns: 100px 1fr 120px; gap: 1rem; align-items: center; margin-bottom: 0.7rem;">
+                    <span style="text-transform: capitalize; font-weight: 600; color: ${colorMap[severity]};">${severity}</span>
+                    <div style="height: 8px; background: var(--bg-tertiary); border-radius: 4px; overflow: hidden;">
+                        <div style="height: 100%; width: ${percentage}%; background: ${colorMap[severity]}; border-radius: 4px; box-shadow: 0 0 8px ${colorMap[severity]}40;"></div>
+                    </div>
+                    <span style="text-align: right; font-weight: 600; color: var(--text-secondary);">${count} flags</span>
                 </div>
             </div>
         `;
@@ -482,21 +482,20 @@ async function viewUserDetail(userId) {
         
         const user = data.user;
         const wallet = data.wallet;
-        const campaign = data.campaign;
         
         let html = `
             <h2>${user.name}</h2>
             
             <div class="user-detail-section">
                 <h3>Profile Information</h3>
-                <div class="detail-row"><span class="detail-label">User ID:</span><span class="detail-value">${user.user_id}</span></div>
+                <div class="detail-row"><span class="detail-label">User ID:</span><span class="detail-value">${user.id}</span></div>
                 <div class="detail-row"><span class="detail-label">Email:</span><span class="detail-value">${user.email}</span></div>
-                <div class="detail-row"><span class="detail-label">Status:</span><span class="detail-value">${user.status}</span></div>
+                <div class="detail-row"><span class="detail-label">Lifecycle Stage:</span><span class="detail-value">${user.lifecycle_stage}</span></div>
                 <div class="detail-row"><span class="detail-label">Country:</span><span class="detail-value">${user.country}</span></div>
-                <div class="detail-row"><span class="detail-label">Acquisition Source:</span><span class="detail-value">${user.source}</span></div>
-                <div class="detail-row"><span class="detail-label">High-Value Score:</span><span class="detail-value">${user.high_value_score.toFixed(1)}/100</span></div>
-                <div class="detail-row"><span class="detail-label">Account Created:</span><span class="detail-value">${new Date(user.creation_date).toLocaleDateString()}</span></div>
-                <div class="detail-row"><span class="detail-label">Last Active:</span><span class="detail-value">${new Date(user.last_active).toLocaleDateString()}</span></div>
+                <div class="detail-row"><span class="detail-label">Acquisition Source:</span><span class="detail-value">${user.acquisition_source}</span></div>
+                <div class="detail-row"><span class="detail-label">Estimated LTV:</span><span class="detail-value">$${(user.estimated_ltv || 0).toLocaleString(undefined, {maximumFractionDigits: 2})}</span></div>
+                <div class="detail-row"><span class="detail-label">Account Created:</span><span class="detail-value">${new Date(user.first_seen_at).toLocaleDateString()}</span></div>
+                <div class="detail-row"><span class="detail-label">Last Active:</span><span class="detail-value">${user.last_activity_at ? new Date(user.last_activity_at).toLocaleDateString() : 'N/A'}</span></div>
             </div>
         `;
         
@@ -505,32 +504,39 @@ async function viewUserDetail(userId) {
                 <div class="user-detail-section">
                     <h3>Wallet Information</h3>
                     <div class="detail-row"><span class="detail-label">Blockchain:</span><span class="detail-value">${wallet.blockchain}</span></div>
-                    <div class="detail-row"><span class="detail-label">Balance:</span><span class="detail-value">$${wallet.balance_usd.toLocaleString()}</span></div>
-                    <div class="detail-row"><span class="detail-label">Transactions:</span><span class="detail-value">${wallet.transaction_count}</span></div>
-                    <div class="detail-row"><span class="detail-label">Last Transaction:</span><span class="detail-value">${wallet.last_transaction ? new Date(wallet.last_transaction).toLocaleDateString() : 'N/A'}</span></div>
+                    <div class="detail-row"><span class="detail-label">Balance:</span><span class="detail-value">$${wallet.balance_usd ? wallet.balance_usd.toLocaleString() : '0'}</span></div>
+                    <div class="detail-row"><span class="detail-label">Activity Score:</span><span class="detail-value">${(wallet.activity_score || 0).toFixed(1)}/100</span></div>
+                    <div class="detail-row"><span class="detail-label">Transactions:</span><span class="detail-value">${wallet.transaction_count || 0}</span></div>
+                    <div class="detail-row"><span class="detail-label">Wallet Age:</span><span class="detail-value">${wallet.wallet_age_days || 0} days</span></div>
                 </div>
             `;
         }
         
-        if (campaign) {
+        if (data.tickets && data.tickets.length > 0) {
             html += `
                 <div class="user-detail-section">
-                    <h3>Acquisition Campaign</h3>
-                    <div class="detail-row"><span class="detail-label">Campaign:</span><span class="detail-value">${campaign.campaign_name}</span></div>
-                    <div class="detail-row"><span class="detail-label">Channel:</span><span class="detail-value">${campaign.channel}</span></div>
-                    <div class="detail-row"><span class="detail-label">CPA:</span><span class="detail-value">$${campaign.cpa.toFixed(2)}</span></div>
+                    <h3>Support Tickets (${data.tickets.length})</h3>
+                    ${data.tickets.map(ticket => `
+                        <div style="margin-bottom: 1rem; padding: 1rem; background: var(--bg-tertiary); border-radius: 6px;">
+                            <div style="margin-bottom: 0.5rem;">
+                                <strong>${ticket.subject}</strong>
+                                <span class="badge status-${ticket.status}" style="margin-left: 0.5rem;">${ticket.status}</span>
+                            </div>
+                            <div style="font-size: 0.9rem; color: var(--text-secondary);">Category: ${ticket.category} | Priority: ${ticket.priority}</div>
+                        </div>
+                    `).join('')}
                 </div>
             `;
         }
         
-        if (data.risk_flags.length > 0) {
+        if (data.risk_flags && data.risk_flags.length > 0) {
             html += `
                 <div class="user-detail-section">
                     <h3>Risk Flags (${data.risk_flags.length})</h3>
                     ${data.risk_flags.map(flag => `
                         <div style="margin-bottom: 1rem; padding: 1rem; background: var(--bg-tertiary); border-radius: 6px;">
                             <div style="margin-bottom: 0.5rem;">
-                                <strong>${flag.flag_type}</strong>
+                                <strong>${flag.type}</strong>
                                 <span class="badge severity-${flag.severity}" style="margin-left: 0.5rem;">${flag.severity}</span>
                             </div>
                             <div style="font-size: 0.9rem; color: var(--text-secondary);">${flag.description}</div>
@@ -540,18 +546,17 @@ async function viewUserDetail(userId) {
             `;
         }
         
-        if (data.actions.length > 0) {
+        if (data.recovery_actions && data.recovery_actions.length > 0) {
             html += `
                 <div class="user-detail-section">
-                    <h3>Recommended Actions (${data.actions.length})</h3>
-                    ${data.actions.map(action => `
+                    <h3>Recovery Actions (${data.recovery_actions.length})</h3>
+                    ${data.recovery_actions.map(action => `
                         <div style="margin-bottom: 1rem; padding: 1rem; background: var(--bg-tertiary); border-radius: 6px;">
                             <div style="margin-bottom: 0.5rem;">
-                                <strong>${action.action_type}</strong>
+                                <strong>${action.type}</strong>
                                 <span class="badge status-${action.status}" style="margin-left: 0.5rem;">${action.status}</span>
                             </div>
-                            <div style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem;">${action.reason}</div>
-                            <div style="font-size: 0.85rem; color: var(--primary);">Potential: ${action.estimated_recovery_value}</div>
+                            <div style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Recovery Value: $${(action.recovery_value || 0).toLocaleString()}</div>
                         </div>
                     `).join('')}
                 </div>
@@ -604,4 +609,171 @@ document.addEventListener('click', (e) => {
     if (e.target === modal || e.target.classList.contains('modal-close')) {
         modal.classList.remove('active');
     }
+});
+
+// ===== CHAT WIDGET =====
+
+class ChatWidget {
+    constructor() {
+        this.sessionId = this.generateSessionId();
+        this.widget = document.getElementById('chat-widget');
+        this.messagesContainer = document.getElementById('chat-messages');
+        this.input = document.getElementById('chat-input');
+        this.sendBtn = document.getElementById('chat-send');
+        this.toggleBtn = document.getElementById('chat-toggle');
+        this.minimizeBtn = document.getElementById('chat-minimize');
+        this.closeBtn = document.getElementById('chat-close');
+        this.status = document.getElementById('chat-status');
+        this.header = document.querySelector('.chat-header');
+        
+        this.isOpen = false;
+        this.isMinimized = false;
+        this.chatAvailable = false;
+        
+        this.init();
+    }
+    
+    generateSessionId() {
+        return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    }
+    
+    init() {
+        // Check if chat is available
+        this.checkChatAvailability();
+        
+        // Event listeners
+        this.toggleBtn.addEventListener('click', () => this.toggle());
+        this.sendBtn.addEventListener('click', () => this.sendMessage());
+        this.input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                this.sendMessage();
+            }
+        });
+        this.closeBtn.addEventListener('click', () => this.close());
+        this.minimizeBtn.addEventListener('click', () => this.minimize());
+        this.header.addEventListener('click', (e) => {
+            if (!e.target.classList.contains('chat-btn')) {
+                this.minimize();
+            }
+        });
+        
+        // Add welcome message
+        this.addMessage('assistant', 'Hi! 👋 I\'m your RUD Assistant. Ask me anything about user risks, recovery actions, or recovery strategies!');
+    }
+    
+    checkChatAvailability() {
+        fetch('/api/health')
+            .then(r => r.json())
+            .then(data => {
+                this.chatAvailable = data.chatbot_ready;
+                if (!this.chatAvailable) {
+                    this.addMessage('system', 'Chat feature unavailable - GROQ API key not configured');
+                }
+            })
+            .catch(() => {
+                this.chatAvailable = false;
+                this.addMessage('system', 'Unable to connect to chat service');
+            });
+    }
+    
+    toggle() {
+        if (this.isOpen) {
+            this.close();
+        } else {
+            this.open();
+        }
+    }
+    
+    open() {
+        this.isOpen = true;
+        this.widget.classList.remove('hidden');
+        this.widget.classList.remove('minimized');
+        this.toggleBtn.classList.add('hidden');
+        this.input.focus();
+    }
+    
+    close() {
+        this.isOpen = false;
+        this.widget.classList.add('hidden');
+        this.toggleBtn.classList.remove('hidden');
+    }
+    
+    minimize() {
+        this.isMinimized = !this.isMinimized;
+        if (this.isMinimized) {
+            this.widget.classList.add('minimized');
+            this.minimizeBtn.textContent = '+';
+        } else {
+            this.widget.classList.remove('minimized');
+            this.minimizeBtn.textContent = '−';
+            this.input.focus();
+        }
+    }
+    
+    async sendMessage() {
+        const message = this.input.value.trim();
+        if (!message) return;
+        
+        if (!this.chatAvailable) {
+            this.addMessage('system', 'Chat service not available. Please ensure GROQ_API_KEY is set.');
+            return;
+        }
+        
+        // Add user message
+        this.addMessage('user', message);
+        this.input.value = '';
+        
+        // Show typing status
+        this.status.classList.add('typing');
+        this.status.textContent = 'AI is thinking';
+        this.sendBtn.classList.add('loading');
+        
+        try {
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: message,
+                    session_id: this.sessionId
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                this.addMessage('assistant', data.response);
+            } else {
+                this.addMessage('system', `Error: ${data.detail || 'Unknown error'}`);
+            }
+        } catch (error) {
+            this.addMessage('system', `Connection error: ${error.message}`);
+        } finally {
+            this.status.classList.remove('typing');
+            this.status.textContent = '';
+            this.sendBtn.classList.remove('loading');
+        }
+    }
+    
+    addMessage(role, content) {
+        const messageEl = document.createElement('div');
+        messageEl.className = `chat-message ${role}`;
+        
+        const contentEl = document.createElement('div');
+        contentEl.className = 'chat-message-content';
+        contentEl.textContent = content;
+        
+        messageEl.appendChild(contentEl);
+        this.messagesContainer.appendChild(messageEl);
+        
+        // Scroll to bottom
+        setTimeout(() => {
+            this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+        }, 0);
+    }
+}
+
+// Initialize chat widget when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    new ChatWidget();
 });

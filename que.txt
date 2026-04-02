@@ -1,0 +1,67 @@
+ Risk Analysis
+"How many critical risks do we have?"
+"Show me all high severity risks"
+"What is the onboarding delay issue?"
+"List users with inactivity risks"
+"Which users have unresolved support tickets?"
+"Show me all abandoned users"
+👤 User Profiles & Lookup
+"Show me user_onboarding_000 profile"
+"Get profile for user_inactive_001"
+"Show profile of user_abandoned_004"
+"What's the status of user_support_002?"
+💎 High-Value & Priority Users
+"Show me high value users"
+"List high value users with risks"
+"Which users have the highest recovery potential?"
+"Show me critical priority users"
+"Who are the most valuable users at risk?"
+⚡ Recovery Actions
+"What recovery actions are pending?"
+"Show me all approved recovery actions"
+"List recovery actions for pending approval"
+"How many actions have been executed?"
+📈 Statistics & Metrics
+"What's the total recovery potential?"
+"How many users are in the system?"
+"What's the average recovery value per action?"
+"Break down the risk types"
+"Show me the severity breakdown"
+🎯 Recovery Strategies
+"What's the best strategy for onboarding dropouts?"
+"How should we recover inactive users?"
+"What actions help with support issues?"
+" Risk Analysis
+"How many critical risks do we have?"
+"Show me all high severity risks"
+"What is the onboarding delay issue?"
+"List users with inactivity risks"
+"Which users have unresolved support tickets?"
+"Show me all abandoned users"
+👤 User Profiles & Lookup
+"Show me user_onboarding_000 profile"
+"Get profile for user_inactive_001"
+"Show profile of user_abandoned_004"
+"What's the status of user_support_002?"
+💎 High-Value & Priority Users
+"Show me high value users"
+"List high value users with risks"
+"Which users have the highest recovery potential?"
+"Show me critical priority users"
+"Who are the most valuable users at risk?"
+⚡ Recovery Actions
+"What recovery actions are pending?"
+"Show me all approved recovery actions"
+"List recovery actions for pending approval"
+"How many actions have been executed?"
+📈 Statistics & Metrics
+"What's the total recovery potential?"
+"How many users are in the system?"
+"What's the average recovery value per action?"
+"Break down the risk types"
+"Show me the severity breakdown"
+🎯 Recovery Strategies
+"What's the best strategy for onboarding dropouts?"
+"How should we recover inactive users?"
+"What actions help with support issues?"
+"Recommend recovery for abandoned users""

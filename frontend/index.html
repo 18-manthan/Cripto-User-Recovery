@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RUD - High-Value User Recovery Engine</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -11,7 +12,10 @@
         <!-- Header -->
         <header class="header">
             <div class="header-content">
-                <h1>High-Value User Recovery Engine</h1>
+                <h1>
+                    <span class="animated-coin-icon"><i class="fas fa-coins"></i></span>
+                    High-Value User Recovery Engine
+                </h1>
                 <p>Real-time identification and recovery system for high-value crypto users</p>
             </div>
             <div class="health-status">
@@ -42,19 +46,19 @@
             <aside class="sidebar">
                 <nav class="nav-menu">
                     <a href="#" data-section="overview" class="nav-item active">
-                        <span class="icon">📊</span> Overview
+                        <i class="fas fa-chart-line icon"></i> Overview
                     </a>
                     <a href="#" data-section="risks" class="nav-item">
-                        <span class="icon">⚠️</span> Risk Flags
+                        <i class="fas fa-exclamation-triangle icon"></i> Risk Flags
                     </a>
                     <a href="#" data-section="actions" class="nav-item">
-                        <span class="icon">⚡</span> Actions
+                        <i class="fas fa-bolt icon"></i> Actions/Tickets
                     </a>
                     <a href="#" data-section="scenarios" class="nav-item">
-                        <span class="icon">🎯</span> Scenarios
+                        <i class="fas fa-bullseye icon"></i> Scenarios
                     </a>
                     <a href="#" data-section="users" class="nav-item">
-                        <span class="icon">👥</span> Users
+                        <i class="fas fa-users icon"></i> Users
                     </a>
                 </nav>
             </aside>
@@ -68,29 +72,29 @@
                     
                     <div class="overview-grid">
                         <div class="overview-card">
-                            <h3>📈 User Status Distribution</h3>
+                            <h3><i class="fas fa-chart-bar"></i> User Status Distribution</h3>
                             <div id="user-status-chart" class="chart-placeholder"></div>
                         </div>
                         
                         <div class="overview-card">
-                            <h3>🎯 Risk Severity Breakdown</h3>
+                            <h3><i class="fas fa-warning"></i> Risk Severity Breakdown</h3>
                             <div id="severity-chart" class="chart-placeholder"></div>
                         </div>
                         
                         <div class="overview-card">
-                            <h3>⚡ Recovery Potential</h3>
+                            <h3><i class="fas fa-dollar-sign animated-dollar"></i> Recovery Potential</h3>
                             <div class="metric">
-                                <div class="metric-value" id="recovery-potential">$0</div>
+                                <div class="metric-value" id="recovery-potential"><i class="fas fa-coins"></i> $0</div>
                                 <div class="metric-label">Estimated Full Value</div>
                             </div>
                             <div class="metric">
-                                <div class="metric-value" id="avg-recovery">$0</div>
+                                <div class="metric-value" id="avg-recovery"><i class="fas fa-coins"></i> $0</div>
                                 <div class="metric-label">Avg Per Action</div>
                             </div>
                         </div>
                         
                         <div class="overview-card">
-                            <h3>📋 Action Summary</h3>
+                            <h3><i class="fas fa-list-check"></i> Action Summary</h3>
                             <div id="action-summary" class="action-summary"></div>
                         </div>
                     </div>
@@ -168,6 +172,31 @@
             <div id="user-detail-content"></div>
         </div>
     </div>
+
+    <!-- Floating Chat Widget -->
+    <div id="chat-widget" class="chat-widget">
+        <div class="chat-header">
+            <h3>🤖 RUD Assistant</h3>
+            <button id="chat-minimize" class="chat-btn" title="Minimize">−</button>
+            <button id="chat-close" class="chat-btn" title="Close">✕</button>
+        </div>
+        <div id="chat-messages" class="chat-messages"></div>
+        <div class="chat-input-area">
+            <input 
+                id="chat-input" 
+                type="text" 
+                placeholder="Ask about risks, users, recovery actions..." 
+                autocomplete="off"
+            />
+            <button id="chat-send" class="chat-send-btn" title="Send message">→</button>
+        </div>
+        <div id="chat-status" class="chat-status"></div>
+    </div>
+
+    <!-- Chat Floating Button -->
+    <button id="chat-toggle" class="chat-toggle" title="Open AI Assistant">
+        <span class="chat-icon">💬</span>
+    </button>
 
     <script src="script.js"></script>
 </body>
