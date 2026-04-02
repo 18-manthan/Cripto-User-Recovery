@@ -17,3 +17,6 @@ venv/
 
  ./assistant_audit.jsonl
  .conversation_memory.jsonl
+
+ MD/
+ ..MD/
