@@ -70,7 +70,7 @@ class RiskFlag(Base):
     
     id = Column(String, primary_key=True)
     user_id = Column(String, ForeignKey("user_profiles.id"), nullable=False)
-    flag_type = Column(String)  # onboarding_incomplete, inactivity, support_ticket, compliance, low_activity
+    flag_type = Column(String)  # onboarding_incomplete, inactivity, support_unresolved, compliance_issue, low_activity, unusual_behavior
     severity = Column(String)  # critical, high, medium, low
     description = Column(Text)
     detected_at = Column(DateTime, default=datetime.utcnow)

@@ -1,6 +1,7 @@
 """
-Dummy data generator for RUD demo
-Creates realistic crypto platform user scenarios
+Legacy / alternate schema — not wired to the current FastAPI models.
+
+Use ``seed_db.py`` for the demo database (personas + rule-based risk flags).
 """
 from datetime import datetime, timedelta
 import random

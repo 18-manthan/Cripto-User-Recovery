@@ -38,13 +38,13 @@ Key Relationships:
 
 Important Field Values:
 - lifecycle_stage: onboarding, active, inactive, churned, high_value
-- acquisition_source: twitter, discord, affiliate, paid_ads, organic
-- flag_type: onboarding_incomplete, inactivity, support_ticket, compliance, low_activity
+- acquisition_source: twitter, discord, affiliate, paid_ads, organic, referral, content
+- flag_type: onboarding_incomplete, inactivity, support_unresolved, compliance_issue, low_activity, unusual_behavior
 - severity: critical, high, medium, low
 - status (tickets): open, pending, resolved, escalated
 - status (actions): pending, approved, executed, failed
 - priority: critical, high, medium, low
-- category (tickets): kyc_delay, withdrawal_issue, login_problem, transaction_error, compliance
+- category (tickets): kyc_delay, withdrawal_issue, login_problem, transaction_error, compliance, account_locked, API_issue
 - action_type: email_outreach, priority_support, workflow_trigger, account_review, incentive_offer
 - channel: twitter, discord, affiliate, paid_ads, content, organic
 """
@@ -68,13 +68,13 @@ Join rules:
 Important values:
 - lifecycle_stage: onboarding, active, inactive, churned, high_value
 - severity: critical, high, medium, low
-- flag_type: onboarding_incomplete, inactivity, support_ticket, compliance, low_activity
+- flag_type: onboarding_incomplete, inactivity, support_unresolved, compliance_issue, low_activity, unusual_behavior
 - status (tickets): open, pending, resolved, escalated
 - status (actions): pending, approved, executed, failed
 - priority: critical, high, medium, low
-- category (tickets): kyc_delay, withdrawal_issue, login_problem, transaction_error, compliance
+- category (tickets): kyc_delay, withdrawal_issue, login_problem, transaction_error, compliance, account_locked, API_issue
 - action_type: email_outreach, priority_support, workflow_trigger, account_review, incentive_offer
-- acquisition_source: twitter, discord, affiliate, paid_ads, organic
+- acquisition_source: twitter, discord, affiliate, paid_ads, organic, referral, content
 
 COMMON QUERY PATTERNS:
 1. Risk Analysis: "How many critical risks?" → COUNT where severity='critical'
