@@ -1,5 +1,9 @@
 // ===== API BASE URL =====
-const API_BASE = 'https://rud-backend.onrender.com/api';
+// Use the same host as this page (run backend with `python main.py` → open http://localhost:8000).
+// Override for split hosting: <script>window.RUD_API_BASE='https://your-api.example.com'</script> before this file.
+const API_BASE = (typeof window !== 'undefined' && window.RUD_API_BASE)
+    ? `${String(window.RUD_API_BASE).replace(/\/$/, '')}/api`
+    : `${window.location.origin}/api`;
 const AUTH_TOKEN_KEY = 'rud_admin_token';
 
 // ===== STATE =====
