@@ -12,6 +12,13 @@ from typing import List, Dict, Optional
 from sqlalchemy import func
 import os
 import uuid
+from pathlib import Path
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parent / ".env")
+except ImportError:
+    pass
 
 from database import SessionLocal, init_db
 from models import UserProfile, Wallet, RiskFlag, SupportTicket, RecoveryAction, Campaign

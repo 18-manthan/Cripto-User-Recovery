@@ -836,8 +836,9 @@ async function sendChatMessage(userQuery) {
             
             messagesContainer.appendChild(botMessageDiv);
         } else {
-            // Add error message
-            const errorDiv = createChatMessage('error', `Error: ${data.error || 'Unknown error'}`);
+            const errRaw = data.error || 'Unknown error';
+            const errText = errRaw.startsWith('Error:') ? errRaw : `Error: ${errRaw}`;
+            const errorDiv = createChatMessage('error', errText);
             messagesContainer.appendChild(errorDiv);
         }
         

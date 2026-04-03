@@ -10,6 +10,7 @@ import re
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 from groq import Groq
+from groq import APIConnectionError, AuthenticationError, APITimeoutError, RateLimitError
 from sqlalchemy import text, inspect
 from database import SessionLocal
 from models import UserProfile, Wallet, RiskFlag, SupportTicket, RecoveryAction, Campaign
@@ -124,7 +125,8 @@ class RUDAgent:
             "executed", "failed", "kyc", "withdrawal", "login", "compliance", "database",
             "data", "sql", "count", "list", "show", "find", "which", "who", "how", "total",
             "average", "avg", "breakdown", "summary", "status", "stages", "country",
-            "acquisition", "source", "sources", "potential", "users", "records"
+            "acquisition", "source", "sources", "potential", "users", "records",
+            "plan", "help", "demo",
         }
         self.blocked_patterns = [
             r"\bcapital\b",
@@ -178,7 +180,10 @@ class RUDAgent:
         if any(token in self.allowed_keywords for token in tokens):
             return True
 
-        id_like_match = re.search(r"\b(user|account|investor)_[a-z0-9_]+\b", normalized)
+        id_like_match = re.search(
+            r"\b(user|account|investor|trader|holder|proc|demo)_[a-z0-9_]+\b",
+            normalized,
+        )
         email_like_match = re.search(r"\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b", normalized)
         if id_like_match or email_like_match:
             return True
@@ -235,9 +240,45 @@ class RUDAgent:
         
         return schema_info
     
+    def _groq_data_error(self, exc: Exception, where: str) -> Dict[str, Any]:
+        """Map Groq/client failures to actionable messages for operators."""
+        if isinstance(exc, APIConnectionError):
+            return {
+                "sql_query": None,
+                "error": (
+                    "AI service unreachable (network/VPN/firewall or Groq outage). "
+                    "Check you can reach the internet, try disabling VPN, "
+                    "and confirm GROQ_API_KEY is set on the server. "
+                    f"({where})"
+                ),
+            }
+        if isinstance(exc, AuthenticationError):
+            return {
+                "sql_query": None,
+                "error": "Groq rejected the API key. Set a valid GROQ_API_KEY in the environment and restart the server.",
+            }
+        if isinstance(exc, RateLimitError):
+            return {
+                "sql_query": None,
+                "error": "Groq rate limit reached. Wait a minute and try again, or use a tier with higher limits.",
+            }
+        if isinstance(exc, APITimeoutError):
+            return {
+                "sql_query": None,
+                "error": "Groq request timed out. Try a shorter question or try again.",
+            }
+        return {
+            "sql_query": None,
+            "error": f"{where}: {exc}",
+        }
+
     def generate_sql(self, user_query: str) -> Dict[str, Any]:
         """Generate SQL query from natural language using Groq"""
-        
+        if not (os.getenv("GROQ_API_KEY") or "").strip():
+            return {
+                "sql_query": None,
+                "error": "GROQ_API_KEY is not set. Add it to the server environment (e.g. backend/.env) and restart.",
+            }
         try:
             response = self.client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
@@ -265,10 +306,7 @@ class RUDAgent:
                 }
         
         except Exception as e:
-            return {
-                "sql_query": None,
-                "error": f"Error: {str(e)}"
-            }
+            return self._groq_data_error(e, "Groq generate_sql")
 
     def refine_sql(self, user_query: str, failed_sql: str, execution_error: str) -> Dict[str, Any]:
         """Ask the model to repair an invalid SQL query using the schema and runtime error."""
@@ -321,10 +359,9 @@ Remember:
                 "explanation": response_text[:200]
             }
         except Exception as e:
-            return {
-                "sql_query": None,
-                "error": f"Error refining SQL: {str(e)}"
-            }
+            err = self._groq_data_error(e, "Groq refine_sql")
+            err["error"] = err.get("error") or f"Error refining SQL: {e}"
+            return err
     
     def execute_sql(self, sql_query: str) -> Dict[str, Any]:
         """Execute SQL query safely"""
