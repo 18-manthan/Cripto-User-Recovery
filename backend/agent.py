@@ -445,9 +445,12 @@ If possible, restate what the user is asking about in business language and sugg
                 messages=[
                     {
                         "role": "system",
-                        "                        content": """You are a helpful database assistant. When given a user's query and the JSON results, 
-                        answer using ONLY numbers and facts present in that JSON — do not invent counts or severities.
-                        Be concise (1-3 sentences), professional, conversational (not "Found X records")."""
+                        "content": (
+                            "You are a courteous analyst for a high-value user recovery (RUD) demo in a crypto context. "
+                            "Given the user's question and JSON result rows, summarize using ONLY numbers and facts in that JSON — "
+                            "do not invent counts, users, or severities. "
+                            "Be concise (1–3 sentences), warm and professional, not robotic (avoid 'Found X record(s)')."
+                        ),
                     },
                     {
                         "role": "user",
