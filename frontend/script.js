@@ -712,11 +712,93 @@ function showError(message) {
     alert('Error: ' + message);
 }
 
-// ===== MODAL CLOSE =====
+// ===== MODALS (user detail + simulate preview) =====
+function closeSimulateActionModal() {
+    const modal = document.getElementById('simulate-action-modal');
+    if (!modal) return;
+    modal.classList.remove('active');
+    document.body.style.overflow = '';
+}
+
+function openSimulateActionModal({ mocks, logId, act }) {
+    const modal = document.getElementById('simulate-action-modal');
+    const bodyEl = document.getElementById('simulate-modal-body');
+    const introEl = document.getElementById('simulate-modal-intro');
+    const titleEl = document.getElementById('simulate-modal-title');
+    const preEl = document.getElementById('simulate-modal-raw-pre');
+    if (!modal || !bodyEl || !introEl || !titleEl || !preEl) return;
+
+    const actionLabel = titleCaseActionType(act.action_type);
+    const uid = act.user_id ? String(act.user_id) : '';
+    titleEl.textContent = `Preview: ${actionLabel}`;
+
+    const logShort = logId ? String(logId).slice(0, 8) : '';
+    const line2 = uid
+        ? `Below is what those integrations <em>might</em> look like for <strong>${escapeHtml(actionLabel)}</strong> on <strong>${escapeHtml(uid)}</strong>.`
+        : `Below is what those integrations <em>might</em> look like for <strong>${escapeHtml(actionLabel)}</strong> on this workflow.`;
+    introEl.innerHTML = [
+        'This is a <strong>demo-only</strong> preview: nothing was actually sent to email, Jira, or a CRM.',
+        line2,
+        logShort
+            ? `We still write one row to the demo log so you can trace it (<code>${escapeHtml(logShort)}…</code>).`
+            : '',
+    ]
+        .filter(Boolean)
+        .join(' ');
+
+    bodyEl.innerHTML = '';
+    bodyEl.appendChild(buildSimulateCards(mocks));
+    preEl.textContent = JSON.stringify(mocks, null, 2);
+
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function titleCaseActionType(type) {
+    return String(type || 'action')
+        .split('_')
+        .filter(Boolean)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join(' ');
+}
+
+function titleCaseWords(str) {
+    return String(str)
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join(' ');
+}
+
 document.addEventListener('click', (e) => {
-    const modal = document.getElementById('user-modal');
-    if (e.target === modal || e.target.classList.contains('modal-close')) {
-        modal.classList.remove('active');
+    const userModal = document.getElementById('user-modal');
+    const simModal = document.getElementById('simulate-action-modal');
+    if (e.target === userModal) {
+        userModal.classList.remove('active');
+    }
+    if (simModal && e.target === simModal) {
+        closeSimulateActionModal();
+    }
+    if (e.target.classList.contains('modal-close')) {
+        if (userModal.contains(e.target)) {
+            userModal.classList.remove('active');
+        }
+        if (simModal && simModal.contains(e.target)) {
+            closeSimulateActionModal();
+        }
+    }
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const simModal = document.getElementById('simulate-action-modal');
+    if (simModal?.classList.contains('active')) {
+        closeSimulateActionModal();
+        return;
+    }
+    const userModal = document.getElementById('user-modal');
+    if (userModal?.classList.contains('active')) {
+        userModal.classList.remove('active');
     }
 });
 
@@ -756,6 +838,107 @@ function setupChatInterface() {
     isChatInitialized = true;
 }
 
+function formatInsightBold(text) {
+    if (!text) return '';
+    const parts = String(text).split(/\*\*/);
+    return parts.map((p, i) => (i % 2 === 1 ? `<strong>${escapeHtml(p)}</strong>` : escapeHtml(p))).join('');
+}
+
+function humanizeSimKey(k) {
+    const s = String(k);
+    if (s.endsWith('__c')) {
+        const base = s.slice(0, -3).replace(/_/g, ' ');
+        return `${titleCaseWords(base)} (custom CRM field)`;
+    }
+    return titleCaseWords(s.replace(/_/g, ' '));
+}
+
+/** Nested key–value blocks inside a simulate channel card (no innerHTML). */
+function fillSimulateCardBody(bodyEl, obj) {
+    if (!obj || typeof obj !== 'object') return;
+    Object.entries(obj).forEach(([k, v]) => {
+        const row = document.createElement('div');
+        row.className = 'chat-sim-row';
+        const label = document.createElement('span');
+        label.className = 'chat-sim-field-label';
+        label.textContent = humanizeSimKey(k);
+        const valWrap = document.createElement('div');
+        valWrap.className = 'chat-sim-field-value';
+        if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
+            const sub = document.createElement('div');
+            sub.className = 'chat-sim-subblock';
+            fillSimulateCardBody(sub, v);
+            valWrap.appendChild(sub);
+        } else if (Array.isArray(v)) {
+            valWrap.classList.add('chat-sim-tags');
+            valWrap.textContent = v.join(' · ');
+        } else {
+            valWrap.textContent = v == null ? '—' : String(v);
+        }
+        row.appendChild(label);
+        row.appendChild(valWrap);
+        bodyEl.appendChild(row);
+    });
+}
+
+/** Card grid: Email / Jira / CRM from mock payload. */
+function buildSimulateCards(mocks) {
+    const grid = document.createElement('div');
+    grid.className = 'chat-sim-grid';
+    const channels = [
+        { key: 'email', title: 'Email', icon: '✉' },
+        { key: 'jira', title: 'Jira', icon: '◆' },
+        { key: 'crm', title: 'CRM', icon: '◇' },
+    ];
+    channels.forEach(({ key, title, icon }) => {
+        const data = mocks[key];
+        if (!data || typeof data !== 'object') return;
+        const card = document.createElement('div');
+        card.className = 'chat-sim-card';
+        const head = document.createElement('div');
+        head.className = 'chat-sim-card-head';
+        const ic = document.createElement('span');
+        ic.className = 'chat-sim-card-icon';
+        ic.setAttribute('aria-hidden', 'true');
+        ic.textContent = icon;
+        const tt = document.createElement('span');
+        tt.textContent = title;
+        head.appendChild(ic);
+        head.appendChild(tt);
+        const body = document.createElement('div');
+        body.className = 'chat-sim-card-body';
+        fillSimulateCardBody(body, data);
+        card.appendChild(head);
+        card.appendChild(body);
+        grid.appendChild(card);
+    });
+    return grid;
+}
+
+async function runChatSimulate(act) {
+    const messagesContainer = document.getElementById('chat-messages');
+    try {
+        const res = await apiFetch(`${API_BASE}/chat/simulate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action_type: act.action_type,
+                user_id: act.user_id || null,
+                reason: act.reason || null,
+            }),
+        });
+        const j = await res.json();
+        if (!res.ok || !j.success) {
+            throw new Error(j.detail || j.message || 'Simulate failed');
+        }
+        openSimulateActionModal({ mocks: j.mocks, logId: j.log_id, act });
+    } catch (e) {
+        console.error(e);
+        messagesContainer.appendChild(createChatMessage('error', `Simulate error: ${e.message}`));
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+}
+
 async function sendChatMessage(userQuery) {
     const messagesContainer = document.getElementById('chat-messages');
     
@@ -788,52 +971,101 @@ async function sendChatMessage(userQuery) {
             // Create bot message container
             const botMessageDiv = document.createElement('div');
             botMessageDiv.className = 'chat-message bot';
-            
+            if (data.playbook_id) {
+                botMessageDiv.classList.add('chat-message-playbook');
+            }
+
             const contentDiv = document.createElement('div');
             contentDiv.className = 'message-content';
             
-            // Build the full response with context and formatted data
             let fullContent = '';
-            
-            // Parse and format the response
+            let responseData = null;
             try {
-                const responseData = JSON.parse(data.response);
-                
-                // Check if response has the new format with text and data
-                if (responseData.text && responseData.data !== undefined) {
-                    // New format: combined text + data
-                    fullContent += `<p class="chat-response-context">${escapeHtml(responseData.text)}</p>`;
-                    
-                    // If there's table data, format it
+                responseData = JSON.parse(data.response);
+            } catch (e) {
+                responseData = null;
+            }
+
+            if (responseData) {
+                if (responseData.data !== undefined) {
+                    if (data.playbook_id) {
+                        const title = escapeHtml(data.playbook_id.replace(/_/g, ' '));
+                        fullContent += `<div class="chat-answer-playbook">`;
+                        fullContent += `<header class="chat-playbook-header"><span class="chat-playbook-kicker">Verified playbook</span><h3 class="chat-playbook-title">${title}</h3><p class="chat-playbook-sub">Straight from your demo database: a short summary plus the matching rows. We skip an extra AI “story” on top so you can trust what you see.</p></header>`;
+                    } else if (String(responseData.text || '').trim()) {
+                        fullContent += `<p class="chat-response-context">${escapeHtml(responseData.text)}</p>`;
+                    }
+                    if (Array.isArray(responseData.insights) && responseData.insights.length > 0) {
+                        fullContent += '<div class="chat-insights-card"><div class="chat-insights-label">Key facts</div><ul class="chat-insights">';
+                        responseData.insights.forEach(ins => {
+                            fullContent += `<li>${formatInsightBold(ins)}</li>`;
+                        });
+                        fullContent += '</ul></div>';
+                    }
                     if (Array.isArray(responseData.data) && responseData.data.length > 0) {
-                        const formattedContent = formatJsonResponse(responseData.data, data.row_count || 0);
-                        fullContent += formattedContent;
+                        fullContent += `<div class="chat-table-card"><div class="chat-table-label">Data</div>`;
+                        fullContent += formatJsonResponse(responseData.data, data.row_count || 0);
+                        fullContent += '</div>';
+                    }
+                    if (data.playbook_id) {
+                        fullContent += '</div>';
                     }
                 } else if (Array.isArray(responseData)) {
-                    // Old format: just array of data
                     if (data.context) {
                         fullContent += `<p class="chat-response-context">${escapeHtml(data.context)}</p>`;
                     }
-                    const formattedContent = formatJsonResponse(responseData, data.row_count || 0);
-                    fullContent += formattedContent;
+                    fullContent += formatJsonResponse(responseData, data.row_count || 0);
                 } else {
-                    // Object but not our new format
                     if (data.context) {
                         fullContent += `<p class="chat-response-context">${escapeHtml(data.context)}</p>`;
                     }
-                    const formattedContent = formatJsonResponse(responseData, data.row_count || 0);
-                    fullContent += formattedContent;
+                    fullContent += formatJsonResponse(responseData, data.row_count || 0);
                 }
-            } catch (e) {
-                // If not JSON, use response as plain text
+            } else {
                 fullContent += `<p class="chat-response-text">${escapeHtml(data.response)}</p>`;
             }
-            
+
             contentDiv.innerHTML = fullContent;
+
+            if (responseData && Array.isArray(responseData.suggested_actions) && responseData.suggested_actions.length > 0) {
+                const simWrap = document.createElement('div');
+                simWrap.className = 'chat-suggested-actions';
+                const hint = document.createElement('p');
+                hint.className = 'chat-sim-hint';
+                hint.innerHTML =
+                    '<strong>Suggested next steps</strong> — tap a button to open a <em>preview window</em> with mock Email, Jira, and CRM payloads (nothing is sent for real). Each run is logged in the demo; raw JSON lives at the bottom of that window.';
+                const btnRow = document.createElement('div');
+                btnRow.className = 'chat-sim-btn-row';
+                responseData.suggested_actions.forEach(act => {
+                    const b = document.createElement('button');
+                    b.type = 'button';
+                    b.className = 'chat-sim-btn';
+                    const label = titleCaseActionType(act.action_type);
+                    b.textContent = `${label}${act.user_id ? ` · ${act.user_id}` : ''}`;
+                    b.title = `Simulate ${act.action_type}${act.reason ? ': ' + act.reason : ''}`;
+                    b.addEventListener('click', () => runChatSimulate(act));
+                    btnRow.appendChild(b);
+                });
+                simWrap.appendChild(hint);
+                simWrap.appendChild(btnRow);
+                contentDiv.appendChild(simWrap);
+            }
+
             botMessageDiv.appendChild(contentDiv);
-            
-            // Add SQL query details if available
-            
+
+            if (data.sql_query) {
+                const det = document.createElement('details');
+                det.className = 'chat-sql-details';
+                const sum = document.createElement('summary');
+                sum.textContent = '📋 Generated SQL';
+                det.appendChild(sum);
+                const pre = document.createElement('pre');
+                pre.className = 'chat-sql-pre';
+                pre.textContent = data.sql_query;
+                det.appendChild(pre);
+                botMessageDiv.appendChild(det);
+            }
+
             messagesContainer.appendChild(botMessageDiv);
         } else {
             const errRaw = data.error || 'Unknown error';

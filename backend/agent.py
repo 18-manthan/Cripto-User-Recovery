@@ -7,7 +7,7 @@ import os
 import json
 import logging
 import re
-from typing import Dict, List, Any, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from datetime import datetime
 from groq import Groq
 from groq import APIConnectionError, AuthenticationError, APITimeoutError, RateLimitError
@@ -123,7 +123,7 @@ class RUDAgent:
             "ltv", "value", "high_value", "high-value", "inactive", "churned", "active",
             "onboarding", "critical", "high", "medium", "low", "pending", "approved",
             "executed", "failed", "kyc", "withdrawal", "login", "compliance", "database",
-            "data", "sql", "count", "list", "show", "find", "which", "who", "how", "total",
+            "data", "sql", "count", "list", "show", "find", "which", "who", "total",
             "average", "avg", "breakdown", "summary", "status", "stages", "country",
             "acquisition", "source", "sources", "potential", "users", "records",
             "plan", "help", "demo",
@@ -141,7 +141,6 @@ class RUDAgent:
             r"\bwhat is\b.*\b(country|india|delhi|world|planet)\b",
         ]
         self.abuse_markers = {
-            "chutiya", "chutiyaa", "madarchod", "bhosdike", "idiot", "stupid",
             "dumb", "useless", "fuck", "fucking", "shit", "bitch", "asshole"
         }
 
@@ -446,15 +445,9 @@ If possible, restate what the user is asking about in business language and sugg
                 messages=[
                     {
                         "role": "system",
-                        "content": """You are a helpful database assistant. When given a user's query and the results from that query, 
-                        provide a natural, conversational response that:
-                        1. Directly answers their question
-                        2. Highlights key insights from the data
-                        3. Is friendly and professional
-                        4. Uses natural language (not "Found X records")
-                        5. For single numeric values, just state the number naturally
-                        6. For tables/lists, summarize what they show
-                        Keep responses concise (1-3 sentences)."""
+                        "                        content": """You are a helpful database assistant. When given a user's query and the JSON results, 
+                        answer using ONLY numbers and facts present in that JSON — do not invent counts or severities.
+                        Be concise (1-3 sentences), professional, conversational (not "Found X records")."""
                     },
                     {
                         "role": "user",
@@ -474,27 +467,85 @@ If possible, restate what the user is asking about in business language and sugg
         except Exception as e:
             # Fallback to generic response if LLM fails
             return f"I found {row_count} result(s) for your query about '{user_query}'."
-    
+
     def is_greeting_or_meta(self, user_query: str) -> Optional[Dict[str, Any]]:
         """Check if query is a greeting or meta-question that doesn't need database query"""
         
         query_lower = self._normalize_query(user_query)
+
+        # Casual / wellbeing / thanks — phrase match first (before SQL or stiff guardrails)
+        _wellbeing = (
+            "I'm doing well, thank you for asking — and I hope you're having a good day as well. "
+            "I'm here to help you work through this RUD demo the way a retention or risk team might look at a crypto exchange or "
+            "custody book: balances, activity, tickets, and who probably deserves a careful, personal touch. "
+            "Whenever you're ready, ask about risk flags, a user id, recovery actions, or portfolio-style metrics."
+        )
+        _thanks = (
+            "You're very welcome — happy to help. "
+            "If you'd like to go deeper, we could look at high-value users at-risk, open compliance or withdrawal tickets, "
+            "or recovery potential in this demo dataset."
+        )
+        phrase_replies: List[
+            Tuple[re.Pattern[str], Union[str, Callable[[Any], str]]]
+        ] = [
+            (
+                re.compile(r"^how(\s+are|\s+['']?re)\s+you(\s+doing)?\??$"),
+                _wellbeing,
+            ),
+            (
+                re.compile(
+                    r"^(hi|hey|hello|yo)[,!. ]*\s*(there|buddy|friend|pal|mate)?\s*[!.?]*$"
+                ),
+                "Hello — good to connect. "
+                "I'm here for this high-value user recovery workspace: on-chain-style balances and activity, risk flags, "
+                "and the sort of follow-ups operators use when markets are noisy and churn is costly. "
+                "What would you like to explore first — for example critical risks, inactive whales, or a named demo user?",
+            ),
+            (
+                re.compile(r"^(what\'?s\s+up|sup)\??$"),
+                "Not much on my side except being ready to help with your RUD data. "
+                "Ask me about users, wallets, risk severity, tickets, or recovery actions — whatever fits what you're trying to prove in the demo.",
+            ),
+            (
+                re.compile(r"^(good\s+(morning|afternoon|evening))\b"),
+                lambda m: (
+                    f"{m.group(1).capitalize()} — thank you for stopping by. "
+                    "I'm here to support questions about this recovery dashboard: user health, flags, and next best actions. "
+                    "Where would you like to start?"
+                ),
+            ),
+            (
+                re.compile(r"^thank(s| you)\b"),
+                _thanks,
+            ),
+            (
+                re.compile(r"^(cheers|appreciate it|much appreciated)\b"),
+                _thanks,
+            ),
+        ]
+        for pattern, reply in phrase_replies:
+            m = pattern.search(query_lower)
+            if m:
+                text = reply(m) if callable(reply) else reply
+                meta_payload = self._safe_text_response(user_query, text)
+                meta_payload["is_meta"] = True
+                return meta_payload
         
         # Greetings and meta questions
         greeting_responses = {
             # Greetings
-            'hello': "👋 Hello! I'm your RUD AI Assistant. How can I help you with your user recovery data today?",
-            'hi': "👋 Hi there! What would you like to know about your users and recovery actions?",
-            'hey': "👋 Hey! Ask me anything about risk flags, users, or recovery actions.",
-            'greetings': "👋 Greetings! I'm here to help you analyze your user recovery system.",
+            'hello': "Hello — I'm glad you're here. I can help you interpret this RUD demo like a trading or growth team reviewing at-risk accounts: who's dormant, who's flagged, and where recovery spend might earn its keep.",
+            'hi': "Hi — lovely to hear from you. Ask me about users, risk flags, recovery actions, or campaign performance in this dataset, in whatever order suits you.",
+            'hey': "Hey there. I'm tuned for this recovery console — think flows, balances, ticket queues, and who needs priority handling when volatility picks up.",
+            'greetings': "Greetings. I'm here to make this demo database easy to read: summaries, lookups, and a clear picture of exposure and opportunity.",
             
             # Meta questions about my capabilities
-            'what can you do': "I can help you with:\n🔍 Risk Analysis - Find critical/high risks\n👥 User Profiles - Look up user details\n💎 High-Value Users - Identify top users at risk\n⚡ Recovery Actions - Check pending approvals\n📊 Statistics - Get aggregate metrics\n🎯 Strategy - Recommend recovery approaches",
-            'what do you do': "I'm an AI assistant that converts your natural language questions into SQL queries and presents results beautifully. I can help with risk analysis, user profiles, recovery actions, and more!",
-            'help': "You can ask me about:\n• Risk flags and severity levels\n• User profiles and lifecycle stages\n• Recovery actions and their status\n• Support tickets and issues\n• Statistics and breakdowns\n• Recovery strategies\n\nJust ask naturally like 'Show me critical risks' or 'How many users are inactive?'",
-            'capabilities': "My capabilities include:\n✅ Risk Analysis (critical, high, medium, low)\n✅ User Lookups (by ID, email, or stage)\n✅ High-Value User Lists\n✅ Recovery Action Tracking\n✅ Support Ticket Monitoring\n✅ Statistical Analysis\n✅ Strategy Recommendations",
-            'commands': "Just ask naturally! Examples:\n• 'How many critical risks?'\n• 'Show me high-value users'\n• 'What recovery actions are pending?'\n• 'List users with inactivity risks'\n• 'Show me abandoned users'\n• 'What's my total recovery potential?'",
-            'examples': "Try asking:\n📊 'How many critical risk flags are there?'\n👥 'Show me user_onboarding_000 profile'\n💎 'Which users have the highest recovery potential?'\n⚡ 'What recovery actions are pending?'\n📈 'What's the total recovery potential?'\n🎯 'What recovery actions are approved?'",
+            'what can you do': "I can help you with:\n• Risk analysis — critical and high-severity flags\n• User context — lifecycle, LTV, acquisition, geography\n• Wallet-style signals — balances, activity, throughput (as modeled here)\n• Recovery actions — pending, approved, and value at stake\n• Support tickets — backlog and categories such as KYC or withdrawals\n• Metrics — counts, breakdowns, and high-value segments",
+            'what do you do': "I turn plain-language questions into SQL against this demo, then summarize what matters — similar to how teams interrogate a warehouse before deciding who to call or waive fees for. Ask naturally; I'll stay polite and data-grounded.",
+            'help': "You might try:\n• 'How many critical risk flags are there?'\n• 'Show high-value inactive users'\n• 'Open compliance or withdrawal tickets'\n• 'Tell me about demo_elena_highvalue_withdrawal'\n\nI'll answer from the database and keep explanations steady and respectful.",
+            'capabilities': "I focus on: risk severity, user and wallet snapshots, recovery pipelines, tickets, campaigns, and roll-ups — the operational side of keeping valuable traders and holders engaged.",
+            'commands': "No special commands needed — just ask. Examples: critical risk count, pending actions, users above an LTV threshold, or a specific user id.",
+            'examples': "For example:\n• Counts and breakdowns of flags or stages\n• Lists of users worth a white-glove path\n• A single-user snapshot with suggested (demo-only) next steps\n\nPick whatever helps your narrative.",
         }
         
         # Check for exact matches (for common greetings)
@@ -513,32 +564,46 @@ If possible, restate what the user is asking about in business language and sugg
         if self.is_abusive(normalized):
             return self._safe_text_response(
                 user_query,
-                "I can help with RUD dashboard questions, but I can’t assist with abusive messages. Ask me about users, risk flags, recovery actions, support tickets, or campaign metrics."
+                "I'd like to keep things respectful — I'm here for your RUD demo questions. "
+                "If you're open to it, we could look at users, risk flags, recovery actions, tickets, or campaign metrics instead."
             )
 
         if not self.is_relevant_data_query(normalized):
             return self._safe_text_response(
                 user_query,
-                "I’m focused only on your RUD data and recovery dashboard. Ask me about users, wallets, risk flags, support tickets, recovery actions, campaigns, or metrics like high-value users and critical priorities."
+                "I specialise in this RUD workspace — think high-value user retention in a crypto-native context: "
+                "balances and activity as we model them, ticket queues, risk flags, and recovery plays. "
+                "I don't have much to add outside that, but if you point me at a metric, a segment, or a user id in this demo, "
+                "I'll walk through it carefully with you."
             )
 
         return None
     
-    def query(self, user_query: str) -> Dict[str, Any]:
-        """Main query method - converts NL -> SQL -> Results -> NL"""
-        
-        # Step 0: Check if this is a greeting or meta question
+    def query(self, user_query: str, session_token: Optional[str] = None) -> Dict[str, Any]:
+        """Playbooks (verified SQL), then NL→SQL; structured insights + session memory."""
+        from playbooks import try_playbook, build_structured_extras, extract_user_id
+        from chat_session import session_get, session_update, session_augment_query
+
         meta_response = self.is_greeting_or_meta(user_query)
         if meta_response:
             return meta_response
 
-        # Step 0.5: Apply topic and behavior guardrails before SQL generation
         guardrail_response = self.handle_guardrails(user_query)
         if guardrail_response:
             return guardrail_response
-        
-        # Step 1: Generate SQL
-        sql_result = self.generate_sql(user_query)
+
+        session = session_get(session_token) if session_token else {}
+        playbook_id: Optional[str] = None
+        playbook_params: Dict[str, Any] = {}
+
+        pb_sql, pb_id, pb_params = try_playbook(user_query, session)
+        if pb_sql:
+            sql_result = {"sql_query": pb_sql, "explanation": f"playbook:{pb_id}"}
+            playbook_id = pb_id
+            playbook_params = pb_params
+        else:
+            augmented = session_augment_query(session_token, user_query)
+            sql_result = self.generate_sql(augmented)
         
         if "error" in sql_result or sql_result.get("sql_query") is None:
             polite_error = f"I apologize, but I had difficulty understanding your query. Could you please rephrase it? For example:\n• 'How many critical risk flags are there?'\n• 'Show me high-value users'\n• 'What recovery actions are pending?'\n\nOr ask for 'help' to see what I can do!"
@@ -583,7 +648,11 @@ If possible, restate what the user is asking about in business language and sugg
             fallback_text = self.generate_generalized_answer(user_query)
             combined_response = {
                 "text": fallback_text,
-                "data": []
+                "data": [],
+                "insights": ["Query could not be executed; try rephrasing or check SQL below."],
+                "suggested_actions": [],
+                "playbook_id": playbook_id,
+                "focus_user_id": playbook_params.get("user_id") or extract_user_id(user_query),
             }
             return {
                 "success": True,
@@ -591,30 +660,56 @@ If possible, restate what the user is asking about in business language and sugg
                 "sql_query": attempted_sql[-1],
                 "row_count": 0,
                 "response": json.dumps(combined_response, default=str),
-                "context": fallback_text
+                "context": fallback_text,
+                "playbook_id": playbook_id,
             }
         
-        # Step 3: Generate natural language response
-        formatted_response = self.format_response(execution_result, user_query)
-        
-        # Step 4: Convert raw results to JSON for frontend formatting
         raw_results = execution_result.get("results", [])
-        results_json = json.dumps(raw_results, default=str)
-        
-        # Create a combined response: natural language + raw JSON for tables
+        if playbook_id:
+            # No separate LLM "story" — avoids duplicate / contradictory prose; insights + table are canonical.
+            formatted_response = ""
+        else:
+            formatted_response = self.format_response(execution_result, user_query)
+
+        insights, suggested_actions = build_structured_extras(
+            playbook_id, playbook_params, raw_results, user_query
+        )
+
+        focus = playbook_params.get("user_id")
+        if not focus and raw_results:
+            for row in raw_results:
+                if isinstance(row, dict) and row.get("user_id"):
+                    focus = row["user_id"]
+                    break
+        if not focus:
+            focus = extract_user_id(user_query)
+        if session_token:
+            session_update(
+                session_token,
+                focus_user_id=focus,
+                last_query=user_query,
+                last_sql=sql_query,
+                playbook_id=playbook_id,
+            )
+
         combined_response = {
             "text": formatted_response,
-            "data": raw_results
+            "data": raw_results,
+            "insights": insights,
+            "suggested_actions": suggested_actions,
+            "playbook_id": playbook_id,
+            "focus_user_id": focus,
         }
         combined_response_json = json.dumps(combined_response, default=str)
-        
+
         return {
             "success": True,
             "query": user_query,
             "sql_query": sql_query,
             "row_count": execution_result.get("row_count", 0),
-            "response": combined_response_json,  # Send both text and data
-            "context": formatted_response  # Also keep formatted text for backward compatibility
+            "response": combined_response_json,
+            "context": formatted_response,
+            "playbook_id": playbook_id,
         }
     
     def close(self):
@@ -632,7 +727,6 @@ def get_agent() -> RUDAgent:
         _agent = RUDAgent()
     return _agent
 
-def query_agent(user_query: str) -> Dict[str, Any]:
-    """Simple function to query the agent"""
+def query_agent(user_query: str, session_token: Optional[str] = None) -> Dict[str, Any]:
     agent = get_agent()
-    return agent.query(user_query)
+    return agent.query(user_query, session_token=session_token)

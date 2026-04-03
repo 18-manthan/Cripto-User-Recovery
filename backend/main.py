@@ -8,10 +8,11 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from datetime import datetime
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from sqlalchemy import func
 import os
 import uuid
+import json
 from pathlib import Path
 
 try:
@@ -21,7 +22,7 @@ except ImportError:
     pass
 
 from database import SessionLocal, init_db
-from models import UserProfile, Wallet, RiskFlag, SupportTicket, RecoveryAction, Campaign
+from models import UserProfile, Wallet, RiskFlag, SupportTicket, RecoveryAction, Campaign, ActionExecutionLog
 from agent import query_agent
 
 app = FastAPI(
@@ -42,6 +43,33 @@ app.add_middleware(
 ADMIN_EMAIL = "admin@cisinlabs.com"
 ADMIN_PASSWORD = "cisin@321!"
 ACTIVE_TOKENS = set()
+
+
+def _mock_integration_payloads(action_type: str, user_id: Optional[str], reason: Optional[str]) -> Dict[str, Any]:
+    """Demo-only payloads that would be webhooks / CRM / email in production."""
+    uid = user_id or "cohort-wide"
+    r = reason or f"RUD playbook: {action_type}"
+    return {
+        "email": {
+            "provider": "mock_sendgrid",
+            "to": "vip-recovery@rud-demo.local",
+            "template_id": "retention_escalation",
+            "merge_fields": {"user_id": uid, "action_type": action_type},
+        },
+        "jira": {
+            "project_key": "RUD",
+            "issue_type": "Task",
+            "summary": f"{action_type.replace('_', ' ').title()} — {uid}",
+            "description": r,
+            "labels": ["rud-demo", action_type],
+        },
+        "crm": {
+            "provider": "mock_salesforce",
+            "object": "Account",
+            "external_id_field": f"rud_user_{uid}",
+            "updates": {"Recovery_Status__c": action_type, "Last_RUD_Action__c": datetime.utcnow().isoformat()},
+        },
+    }
 
 
 # ==================== PYDANTIC MODELS ====================
@@ -66,6 +94,20 @@ class ChatResponse(BaseModel):
     sql_query: Optional[str] = None
     row_count: Optional[int] = None
     error: Optional[str] = None
+    playbook_id: Optional[str] = None
+
+
+class SimulateActionRequest(BaseModel):
+    action_type: str
+    user_id: Optional[str] = None
+    reason: Optional[str] = None
+
+
+class SimulateActionResponse(BaseModel):
+    success: bool
+    log_id: str
+    mocks: Dict[str, Any]
+    message: str = "Simulated — external systems not called in demo mode."
 
 
 class LoginRequest(BaseModel):
@@ -131,7 +173,7 @@ async def chat(request: ChatRequest, _: str = Depends(require_auth)):
     - "Which recovery actions have the highest estimated value?"
     """
     try:
-        result = query_agent(request.query)
+        result = query_agent(request.query, session_token=_)
         
         return ChatResponse(
             success=result.get("success", False),
@@ -139,7 +181,8 @@ async def chat(request: ChatRequest, _: str = Depends(require_auth)):
             response=result.get("response", result.get("error", "No response")),
             sql_query=result.get("sql_query"),
             row_count=result.get("row_count"),
-            error=result.get("error") if not result.get("success") else None
+            error=result.get("error") if not result.get("success") else None,
+            playbook_id=result.get("playbook_id"),
         )
     except Exception as e:
         return ChatResponse(
@@ -148,6 +191,28 @@ async def chat(request: ChatRequest, _: str = Depends(require_auth)):
             response="An error occurred while processing your query",
             error=str(e)
         )
+
+
+@app.post("/api/chat/simulate", response_model=SimulateActionResponse)
+async def chat_simulate_action(request: SimulateActionRequest, _: str = Depends(require_auth)):
+    """Record a simulated execute (email / Jira / CRM shaped payloads) — demo audit trail."""
+    log_id = str(uuid.uuid4())
+    mocks = _mock_integration_payloads(request.action_type, request.user_id, request.reason)
+    db = SessionLocal()
+    try:
+        row = ActionExecutionLog(
+            id=log_id,
+            user_id=request.user_id,
+            action_type=request.action_type,
+            source="chat_simulate",
+            request_summary=(request.reason or "")[:2000],
+            payload_json=json.dumps(mocks, default=str),
+        )
+        db.add(row)
+        db.commit()
+        return SimulateActionResponse(success=True, log_id=log_id, mocks=mocks)
+    finally:
+        db.close()
 
 
 # ==================== DASHBOARD API ====================

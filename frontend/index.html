@@ -201,15 +201,16 @@
                 <section id="chat" class="panel">
                     <div class="panel-header">
                         <h2><i class="fas fa-robot"></i> AI Database Chat</h2>
-                        <p class="section-help">Ask natural language questions about your data. The AI will convert your query to SQL and fetch results.</p>
+                        <p class="section-help">You’re welcome to ask in plain language — the assistant is polite, stays close to your demo data, and understands recovery workflows in a crypto context. Verified SQL templates are used when possible; otherwise the model drafts a query for this database.</p>
                     </div>
                     
                     <div class="chat-container">
                         <!-- Messages Display -->
                         <div id="chat-messages" class="chat-messages">
                             <div class="chat-message system">
-                                <p>👋 Hello! I'm your RUD AI Assistant. Ask me anything about your users, risk flags, recovery actions, and more.</p>
-                                <p class="message-time">Try: "How many critical risk flags are there?" or "Show me all high-value inactive users"</p>
+                                <p>👋 Hello — I’m your RUD assistant. I’ll keep things courteous and focused on high-value user recovery (balances, activity, flags, and what an exchange-style team might do next).</p>
+                                <p class="message-time">Try, for example: “How many critical risk flags are there?” or “Show me high-value inactive users.”</p>
+                                <p class="chat-welcome-extra"><strong>Tip:</strong> Named demo users (such as <code>demo_elena_highvalue_withdrawal</code>) can open a playbook with optional next-step buttons — those are preview-only mockups, not live email, tickets, or CRM changes.</p>
                             </div>
                         </div>
 
@@ -219,7 +220,7 @@
                                 type="text" 
                                 id="chat-input" 
                                 class="chat-input" 
-                                placeholder="Ask a question about the database..."
+                                placeholder="Ask about users, risks, or recovery — in your own words…"
                                 autocomplete="off"
                             />
                             <button id="chat-send-btn" class="chat-send-btn">
@@ -238,6 +239,20 @@
         <div class="modal-content">
             <span class="modal-close">&times;</span>
             <div id="user-detail-content"></div>
+        </div>
+    </div>
+
+    <!-- Demo simulate (mock integrations) -->
+    <div id="simulate-action-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="simulate-modal-title">
+        <div class="modal-content simulate-modal-panel">
+            <button type="button" class="modal-close simulate-modal-close" aria-label="Close preview">&times;</button>
+            <h2 id="simulate-modal-title" class="simulate-modal-title">Demo action preview</h2>
+            <p id="simulate-modal-intro" class="simulate-modal-intro"></p>
+            <div id="simulate-modal-body" class="simulate-modal-body"></div>
+            <details class="chat-sim-raw simulate-modal-raw">
+                <summary>View raw JSON</summary>
+                <pre id="simulate-modal-raw-pre" class="chat-sim-result"></pre>
+            </details>
         </div>
     </div>
 

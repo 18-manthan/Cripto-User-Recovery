@@ -160,3 +160,17 @@ class Campaign(Base):
     
     def __repr__(self):
         return f"<Campaign(id={self.id}, channel={self.channel}, cpa={self.cpa})>"
+
+
+class ActionExecutionLog(Base):
+    """Simulated external actions triggered from chat or dashboard (demo audit trail)."""
+
+    __tablename__ = "action_execution_log"
+
+    id = Column(String, primary_key=True)
+    user_id = Column(String, nullable=True)  # optional FK target; no DB constraint for flexible demo logs
+    action_type = Column(String, nullable=False)
+    source = Column(String, default="chat_simulate")  # chat_simulate, dashboard
+    request_summary = Column(Text)
+    payload_json = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
