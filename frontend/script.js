@@ -1156,20 +1156,56 @@ async function sendChatMessage(userQuery) {
                 hint.className = 'chat-sim-hint';
                 hint.innerHTML =
                     '<strong>Suggested next steps</strong> — tap a button to open a <em>preview window</em> with mock Email, Jira, and CRM payloads (nothing is sent for real). Each run is logged in the demo; raw JSON lives at the bottom of that window.';
-                const btnRow = document.createElement('div');
-                btnRow.className = 'chat-sim-btn-row';
-                responseData.suggested_actions.forEach(act => {
-                    const b = document.createElement('button');
-                    b.type = 'button';
-                    b.className = 'chat-sim-btn';
+                const pickerRow = document.createElement('div');
+                pickerRow.className = 'chat-sim-picker-row';
+
+                const select = document.createElement('select');
+                select.className = 'chat-sim-select';
+                select.setAttribute('aria-label', 'Select a suggested next step');
+
+                const placeholder = document.createElement('option');
+                placeholder.value = '';
+                placeholder.textContent = 'Choose an action…';
+                placeholder.selected = true;
+                placeholder.disabled = true;
+                select.appendChild(placeholder);
+
+                responseData.suggested_actions.forEach((act, idx) => {
+                    const opt = document.createElement('option');
+                    opt.value = String(idx);
                     const label = titleCaseActionType(act.action_type);
-                    b.textContent = `${label}${act.user_id ? ` · ${act.user_id}` : ''}`;
-                    b.title = `Simulate ${act.action_type}${act.reason ? ': ' + act.reason : ''}`;
-                    b.addEventListener('click', () => runChatSimulate(act));
-                    btnRow.appendChild(b);
+                    opt.textContent = `${label}${act.user_id ? ` · ${act.user_id}` : ''}`;
+                    select.appendChild(opt);
                 });
+
+                const goBtn = document.createElement('button');
+                goBtn.type = 'button';
+                goBtn.className = 'chat-sim-btn chat-sim-go';
+                goBtn.textContent = 'Preview';
+                goBtn.disabled = true;
+
+                const updateBtn = () => {
+                    goBtn.disabled = !select.value;
+                    const idx = Number(select.value);
+                    const act = Number.isFinite(idx) ? responseData.suggested_actions[idx] : null;
+                    goBtn.title = act
+                        ? `Simulate ${act.action_type}${act.reason ? ': ' + act.reason : ''}`
+                        : 'Select an action first';
+                };
+                select.addEventListener('change', updateBtn);
+
+                goBtn.addEventListener('click', () => {
+                    const idx = Number(select.value);
+                    if (!Number.isFinite(idx)) return;
+                    const act = responseData.suggested_actions[idx];
+                    if (!act) return;
+                    runChatSimulate(act);
+                });
+
+                pickerRow.appendChild(select);
+                pickerRow.appendChild(goBtn);
                 simWrap.appendChild(hint);
-                simWrap.appendChild(btnRow);
+                simWrap.appendChild(pickerRow);
                 contentDiv.appendChild(simWrap);
             }
 

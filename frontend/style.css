@@ -1457,6 +1457,39 @@ button:disabled {
     align-items: center;
 }
 
+.chat-sim-picker-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    align-items: center;
+    margin-top: 0.65rem;
+}
+
+.chat-sim-select {
+    min-width: min(520px, 100%);
+    flex: 1;
+    min-height: 44px;
+    padding: 0.65rem 0.85rem;
+    border-radius: 14px;
+    border: 1px solid rgba(110, 231, 255, 0.16);
+    background: rgba(6, 14, 26, 0.92);
+    color: var(--text);
+    font: inherit;
+    font-weight: 700;
+}
+
+.chat-sim-go {
+    min-height: 44px;
+    padding: 0.65rem 1rem;
+    border-radius: 14px;
+}
+
+.chat-sim-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
 .chat-sim-hint {
     font-size: 0.85rem;
     color: var(--text-muted);
