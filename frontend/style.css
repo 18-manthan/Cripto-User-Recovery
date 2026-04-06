@@ -991,7 +991,9 @@ button:hover,
 .chat-container {
     display: flex;
     flex-direction: column;
-    min-height: 620px;
+    /* ChatGPT-like: fixed composer + scrollable history inside the panel */
+    height: clamp(560px, 72vh, 860px);
+    min-height: 560px;
     overflow: hidden;
 }
 
@@ -1002,9 +1004,18 @@ button:hover,
     flex: 1;
     min-height: 0;
     padding: 1.4rem;
+    /* Keep last message above the fixed composer */
+    padding-bottom: calc(1.4rem + 92px);
     background:
         linear-gradient(180deg, rgba(4, 11, 20, 0.86), rgba(8, 16, 28, 0.94));
     overflow-y: auto;
+}
+
+.chat-input-area {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    backdrop-filter: blur(10px);
 }
 
 .chat-message {
