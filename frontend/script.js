@@ -19,6 +19,90 @@ let appState = {
 };
 let isChatInitialized = false;
 
+// ===== LIST PAGINATION (Users / Risks / Actions) =====
+const listPagination = {
+    risks: { page: 1, pageSize: 10 },
+    actions: { page: 1, pageSize: 10 },
+    users: { page: 1, pageSize: 10 },
+};
+
+function clamp(n, min, max) {
+    return Math.max(min, Math.min(max, n));
+}
+
+function getPaged(items, key) {
+    const cfg = listPagination[key];
+    const total = Array.isArray(items) ? items.length : 0;
+    const pageSize = clamp(Number(cfg.pageSize) || 10, 5, 100);
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const page = clamp(Number(cfg.page) || 1, 1, totalPages);
+    cfg.page = page;
+    cfg.pageSize = pageSize;
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize;
+    return { page, pageSize, total, totalPages, items: (items || []).slice(start, end) };
+}
+
+function setListPage(key, page) {
+    if (!listPagination[key]) return;
+    listPagination[key].page = page;
+    if (key === 'risks') renderRiskFlags();
+    else if (key === 'actions') renderActions();
+    else if (key === 'users') renderUsers();
+}
+
+function setListPageSize(key, pageSize) {
+    if (!listPagination[key]) return;
+    listPagination[key].pageSize = pageSize;
+    listPagination[key].page = 1;
+    setListPage(key, 1);
+}
+
+function resetListPage(key) {
+    if (!listPagination[key]) return;
+    listPagination[key].page = 1;
+}
+
+function renderListPagination({ key, mountId, total, page, totalPages, pageSize }) {
+    const mount = document.getElementById(mountId);
+    if (!mount) return;
+    if (!total) {
+        mount.innerHTML = '';
+        return;
+    }
+
+    const start = (page - 1) * pageSize + 1;
+    const end = Math.min(page * pageSize, total);
+
+    const sizeOptions = [10, 25, 50, 100];
+    mount.innerHTML = `
+        <div class="list-pagination-inner">
+            <div class="list-pagination-info">
+                Showing <strong>${start}-${end}</strong> of <strong>${total}</strong>
+            </div>
+            <div class="list-pagination-controls">
+                <button class="list-pagination-btn" type="button"
+                    onclick="setListPage('${key}', 1)" ${page <= 1 ? 'disabled' : ''}>First</button>
+                <button class="list-pagination-btn" type="button"
+                    onclick="setListPage('${key}', ${page - 1})" ${page <= 1 ? 'disabled' : ''}>← Prev</button>
+                <span class="list-pagination-page">Page <strong>${page}</strong> / ${totalPages}</span>
+                <button class="list-pagination-btn" type="button"
+                    onclick="setListPage('${key}', ${page + 1})" ${page >= totalPages ? 'disabled' : ''}>Next →</button>
+                <button class="list-pagination-btn" type="button"
+                    onclick="setListPage('${key}', ${totalPages})" ${page >= totalPages ? 'disabled' : ''}>Last</button>
+                <label class="list-pagination-size">
+                    <span>Rows</span>
+                    <select class="list-pagination-select" onchange="setListPageSize('${key}', this.value)">
+                        ${sizeOptions
+                            .map((n) => `<option value="${n}" ${Number(pageSize) === n ? 'selected' : ''}>${n}</option>`)
+                            .join('')}
+                    </select>
+                </label>
+            </div>
+        </div>
+    `;
+}
+
 // ===== INITIALIZATION =====
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('🚀 RUD Demo Dashboard loading...');
@@ -200,9 +284,13 @@ async function loadDashboardData() {
 }
 
 function loadUsers() {
-    // We'll load users on demand in the users section
-    // For now, create a placeholder
-    appState.users = [];
+    // Demo: derive user ids from available events
+    const uniqueUsers = new Set();
+    appState.riskFlags.forEach(flag => uniqueUsers.add(flag.user_id));
+    appState.actions.forEach(action => uniqueUsers.add(action.user_id));
+    appState.users = Array.from(uniqueUsers);
+    appState.filteredUsers = Array.from(uniqueUsers);
+    resetListPage('users');
 }
 
 async function updateHealthStatus() {
@@ -356,13 +444,16 @@ function renderActionSummary() {
 // ===== RISK FLAGS RENDERING =====
 function renderRiskFlags() {
     const container = document.getElementById('risk-flags-list');
+    const paginationMountId = 'risk-flags-pagination';
     
     if (appState.filteredRisks.length === 0) {
         container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✅</div>No risk flags found</div>';
+        document.getElementById(paginationMountId).innerHTML = '';
         return;
     }
     
-    container.innerHTML = appState.filteredRisks.map(flag => `
+    const paged = getPaged(appState.filteredRisks, 'risks');
+    container.innerHTML = paged.items.map(flag => `
         <div class="list-item">
             <div class="list-item-header">
                 <div class="list-item-title">
@@ -384,18 +475,30 @@ function renderRiskFlags() {
             </div>
         </div>
     `).join('');
+
+    renderListPagination({
+        key: 'risks',
+        mountId: paginationMountId,
+        total: paged.total,
+        page: paged.page,
+        totalPages: paged.totalPages,
+        pageSize: paged.pageSize,
+    });
 }
 
 // ===== ACTIONS RENDERING =====
 function renderActions() {
     const container = document.getElementById('actions-list');
+    const paginationMountId = 'actions-pagination';
     
     if (appState.filteredActions.length === 0) {
         container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div>No actions found</div>';
+        document.getElementById(paginationMountId).innerHTML = '';
         return;
     }
     
-    container.innerHTML = appState.filteredActions.map(action => `
+    const paged = getPaged(appState.filteredActions, 'actions');
+    container.innerHTML = paged.items.map(action => `
         <div class="list-item">
             <div class="list-item-header">
                 <div class="list-item-title">${action.action_type.replace(/_/g, ' ')}</div>
@@ -425,6 +528,15 @@ function renderActions() {
             </div>
         </div>
     `).join('');
+
+    renderListPagination({
+        key: 'actions',
+        mountId: paginationMountId,
+        total: paged.total,
+        page: paged.page,
+        totalPages: paged.totalPages,
+        pageSize: paged.pageSize,
+    });
 }
 
 // ===== SCENARIOS RENDERING =====
@@ -466,18 +578,16 @@ function renderScenarios() {
 // ===== USERS RENDERING =====
 function renderUsers() {
     const container = document.getElementById('users-list');
-    
-    // Load user list from risk flags
-    const uniqueUsers = new Set();
-    appState.riskFlags.forEach(flag => uniqueUsers.add(flag.user_id));
-    appState.filteredUsers = Array.from(uniqueUsers);
+    const paginationMountId = 'users-pagination';
     
     if (appState.filteredUsers.length === 0) {
         container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">👥</div>No users found</div>';
+        document.getElementById(paginationMountId).innerHTML = '';
         return;
     }
     
-    container.innerHTML = appState.filteredUsers.slice(0, 50).map(userId => {
+    const paged = getPaged(appState.filteredUsers, 'users');
+    container.innerHTML = paged.items.map(userId => {
         const risks = appState.riskFlags.filter(f => f.user_id === userId);
         const actions = appState.actions.filter(a => a.user_id === userId);
         
@@ -496,6 +606,15 @@ function renderUsers() {
             </div>
         `;
     }).join('');
+
+    renderListPagination({
+        key: 'users',
+        mountId: paginationMountId,
+        total: paged.total,
+        page: paged.page,
+        totalPages: paged.totalPages,
+        pageSize: paged.pageSize,
+    });
 }
 
 // ===== FILTERS =====
@@ -516,6 +635,7 @@ function filterRisks() {
                (!severityFilter || flag.severity === severityFilter);
     });
     
+    resetListPage('risks');
     renderRiskFlags();
 }
 
@@ -528,6 +648,7 @@ function filterActions() {
                (!priorityFilter || action.priority === priorityFilter);
     });
     
+    resetListPage('actions');
     renderActions();
 }
 
@@ -538,6 +659,7 @@ function filterUsers() {
         userId.toLowerCase().includes(searchTerm)
     );
     
+    resetListPage('users');
     renderUsers();
 }
 
@@ -1073,9 +1195,7 @@ async function sendChatMessage(userQuery) {
             const errorDiv = createChatMessage('error', errText);
             messagesContainer.appendChild(errorDiv);
         }
-        
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        
     } catch (error) {
         console.error('Chat error:', error);
         typingDiv.remove();

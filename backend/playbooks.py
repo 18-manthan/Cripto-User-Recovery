@@ -32,6 +32,19 @@ CRITICAL_RISK_COUNT_SQL = """
 SELECT COUNT(*) AS cnt FROM risk_flags WHERE severity = 'critical' LIMIT 1000
 """.strip()
 
+CRITICAL_RISK_USERS_SQL = """
+SELECT up.id AS user_id, up.email, up.name,
+rf.flag_type, rf.severity, rf.description, rf.detected_at,
+up.lifecycle_stage, up.estimated_ltv, up.acquisition_source, up.country,
+w.balance_usd, w.activity_score, w.transaction_count
+FROM risk_flags rf
+JOIN user_profiles up ON up.id = rf.user_id
+LEFT JOIN wallets w ON w.user_id = up.id
+WHERE rf.severity = 'critical'
+ORDER BY rf.detected_at DESC
+LIMIT 200
+""".strip()
+
 PENDING_ACTIONS_SQL = """
 SELECT ra.id AS action_id, ra.user_id, ra.action_type, ra.status, ra.priority,
 ra.estimated_recovery_value, ra.reason
@@ -50,6 +63,18 @@ WHERE up.estimated_ltv >= 12000
 AND up.lifecycle_stage IN ('inactive','onboarding','churned')
 ORDER BY up.estimated_ltv DESC
 LIMIT 40
+""".strip()
+
+HIGH_VALUE_USERS_SQL = """
+SELECT up.id AS user_id, up.email, up.name,
+up.lifecycle_stage, up.estimated_ltv, up.acquisition_source, up.country,
+up.last_activity_at,
+w.balance_usd, w.activity_score, w.transaction_count
+FROM user_profiles up
+LEFT JOIN wallets w ON w.user_id = up.id
+WHERE up.lifecycle_stage = 'high_value'
+ORDER BY up.estimated_ltv DESC
+LIMIT 200
 """.strip()
 
 COMPLIANCE_TICKETS_SQL = """
@@ -101,11 +126,24 @@ def try_playbook(query: str, session: Dict[str, Any]) -> Tuple[Optional[str], Op
     if re.search(r"\b(how many|count)\b.*\b(critical)\b.*\b(risk|flag)", n) or n == "critical risks":
         return CRITICAL_RISK_COUNT_SQL, "critical_risk_count", {}
 
+    if re.search(r"\b(critical)\b.*\b(risk|risks|flag|flags)\b.*\b(user|users)\b", n) or re.search(
+        r"\b(show|list)\b.*\b(critical)\b.*\b(risk|risks|flag|flags)\b", n
+    ):
+        return CRITICAL_RISK_USERS_SQL, "critical_risk_users", {}
+
     if ("pending" in n and "action" in n) or ("recovery" in n and "pending" in n and "action" in n):
         return PENDING_ACTIONS_SQL, "pending_recovery_actions", {}
 
+    # Prefer the "at risk" cohort slice over the generic list.
     if ("high" in n and "value" in n and ("inactive" in n or "at risk" in n or "churn" in n or "drop" in n)):
         return HIGH_VALUE_AT_RISK_SQL, "high_value_at_risk", {}
+
+    # High-value users list (strict match so unrelated queries don't route here).
+    if (
+        n in ("high value users", "high-value users", "show high value users", "list high value users")
+        or re.search(r"\b(high)[ -]value\b.*\b(users?)\b", n)
+    ):
+        return HIGH_VALUE_USERS_SQL, "high_value_users", {}
 
     if "compliance" in n or ("kyc" in n and ("ticket" in n or "open" in n)):
         if "how many" in n:
@@ -191,6 +229,24 @@ def build_structured_extras(
             }
         )
 
+    elif playbook_id == "critical_risk_users":
+        # Rows are risk_flags joined to user snapshot fields; keep insights deterministic.
+        unique_users = {r.get("user_id") for r in rows if r.get("user_id")}
+        insights.append(
+            f"Showing **{len(rows)}** critical-risk flags (up to the latest 200) across **{len(unique_users)}** users."
+        )
+        # Suggest escalation for the top (most recent) user
+        top_uid = rows[0].get("user_id")
+        if top_uid:
+            actions.append(
+                {
+                    "action_type": "priority_support",
+                    "priority": "critical",
+                    "user_id": str(top_uid),
+                    "reason": "Critical risk flag detected — route to VIP support queue",
+                }
+            )
+
     elif playbook_id == "pending_recovery_actions":
         insights.append(f"Showing **{len(rows)}** pending recovery actions (top by priority and value).")
         if rows:
@@ -220,6 +276,20 @@ def build_structured_extras(
                     "reason": "Re-engage high-LTV user at risk of churn",
                 }
             )
+
+    elif playbook_id == "high_value_users":
+        insights.append(f"Showing the top **{len(rows)}** users in the **high_value** lifecycle stage (sorted by LTV).")
+        if rows:
+            u = rows[0].get("user_id")
+            if u:
+                actions.append(
+                    {
+                        "action_type": "account_review",
+                        "priority": "high",
+                        "user_id": str(u),
+                        "reason": "High-value account — consider white-glove review and retention outreach",
+                    }
+                )
 
     elif playbook_id == "compliance_pressure":
         insights.append(f"**{len(rows)}** open compliance / KYC / withdrawal tickets in this view.")
