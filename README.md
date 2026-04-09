@@ -11,11 +11,11 @@ This project now includes an **Agentic Chatbot** that allows users to ask natura
 ```
 User Query (Natural Language)
     ↓
-[Groq LLM] - NL to SQL Conversion
+[OpenAI] - NL to SQL Conversion
     ↓
-SQL Query Execution (SQLite)
+SQL Query Execution (SQLite or Postgres)
     ↓
-[Groq LLM] - Results to Natural Language
+[OpenAI] - Results to Natural Language
     ↓
 User Response (Natural Language)
 ```
@@ -29,7 +29,7 @@ The agent module handles all NL↔SQL conversion and database operations.
 
 **Key Classes:**
 - `RUDAgent`: Main agent class that orchestrates the entire pipeline
-  - `generate_sql()`: Converts natural language to SQL using Groq
+  - `generate_sql()`: Converts natural language to SQL using OpenAI
   - `execute_sql()`: Safely executes SQL queries on the database
   - `format_response()`: Converts query results back to natural language
   - `query()`: Main orchestration method
@@ -88,16 +88,19 @@ Functions added:
 
 ### Setup
 
-1. **Get Groq API Key**
-   - Visit https://console.groq.com/keys
-   - Create free account
-   - Copy your API key
+1. **Get OpenAI API Key**
+   - Create an API key in your OpenAI account
 
 2. **Configure Environment**
    - Copy `.env.example` to `.env`
-   - Add your Groq API key:
+   - Add your OpenAI API key:
      ```
-     GROQ_API_KEY=your_key_here
+     OPENAI_API_KEY=your_key_here
+     OPENAI_MODEL=gpt-4o-mini
+     ```
+   - Configure Postgres (required):
+     ```
+     DATABASE_URL=postgresql+psycopg2://USER:PASSWORD@HOST:5432/DBNAME
      ```
 
 3. **Install Dependencies**
@@ -219,15 +222,15 @@ Every chat response displays the generated SQL query in a collapsible section, a
 
 ## Troubleshooting
 
-### "GROQ_API_KEY not found"
+### "OPENAI_API_KEY not found"
 - Ensure `.env` file exists in backend directory
-- Set `GROQ_API_KEY` environment variable
+- Set `OPENAI_API_KEY` environment variable
 - Restart the server
 
-### "Connection error to Groq"
+### "Connection error to OpenAI"
 - Check internet connection
 - Verify API key is valid
-- Check Groq service status
+- Check OpenAI service status
 
 ### Agent generates invalid SQL
 - Try rephrasing the question
@@ -281,6 +284,6 @@ This will print all SQL queries being executed, helping identify issues.
 
 ---
 
-**Built with**: FastAPI, Groq LLM, SQLAlchemy, JavaScript
+**Built with**: FastAPI, OpenAI, SQLAlchemy, JavaScript
 **Version**: 1.0.0
 **Last Updated**: April 2, 2026

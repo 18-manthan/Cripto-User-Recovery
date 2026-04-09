@@ -7,24 +7,24 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from models import Base
 
-# Get database URL from environment or use default SQLite
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./rud_demo.db")
+# Postgres-only: require DATABASE_URL to be set explicitly.
+DATABASE_URL = (os.getenv("DATABASE_URL") or "").strip()
+if not DATABASE_URL:
+    raise RuntimeError(
+        "DATABASE_URL is not set. Configure Postgres, e.g. "
+        "postgresql+psycopg2://USER:PASSWORD@HOST:5432/DBNAME"
+    )
+if not (DATABASE_URL.startswith("postgresql://") or DATABASE_URL.startswith("postgresql+psycopg2://")):
+    raise RuntimeError(
+        "This deployment is Postgres-only. DATABASE_URL must start with "
+        "'postgresql://' or 'postgresql+psycopg2://'."
+    )
 
-# Create engine based on database type
-if DATABASE_URL.startswith("sqlite"):
-    # SQLite-specific settings
-    engine = create_engine(
-        DATABASE_URL,
-        connect_args={"check_same_thread": False},
-        echo=False
-    )
-else:
-    # PostgreSQL or other database (production)
-    engine = create_engine(
-        DATABASE_URL,
-        echo=False,
-        pool_pre_ping=True  # Test connections before using them
-    )
+engine = create_engine(
+    DATABASE_URL,
+    echo=False,
+    pool_pre_ping=True,  # Test connections before using them
+)
 
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

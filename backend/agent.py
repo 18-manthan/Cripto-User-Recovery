@@ -1,6 +1,6 @@
 """
 Agentic Chatbot - Converts natural language queries to SQL and back
-Uses Groq LLM for intelligent query generation and response formatting
+Uses OpenAI for intelligent query generation and response formatting
 """
 
 import os
@@ -9,14 +9,14 @@ import logging
 import re
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from datetime import datetime
-from groq import Groq
-from groq import APIConnectionError, AuthenticationError, APITimeoutError, RateLimitError
+from openai import OpenAI
+from openai import APIConnectionError, AuthenticationError, APITimeoutError, RateLimitError
 from sqlalchemy import text, inspect
 from database import SessionLocal
 from models import UserProfile, Wallet, RiskFlag, SupportTicket, RecoveryAction, Campaign
 
-# Initialize Groq client
-client = Groq(api_key=os.getenv("GROQ_API_KEY", ""))
+# Initialize OpenAI client
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY", ""))
 logger = logging.getLogger(__name__)
 
 # Database schema information
@@ -239,32 +239,32 @@ class RUDAgent:
         
         return schema_info
     
-    def _groq_data_error(self, exc: Exception, where: str) -> Dict[str, Any]:
-        """Map Groq/client failures to actionable messages for operators."""
+    def _ai_data_error(self, exc: Exception, where: str) -> Dict[str, Any]:
+        """Map OpenAI/client failures to actionable messages for operators."""
         if isinstance(exc, APIConnectionError):
             return {
                 "sql_query": None,
                 "error": (
-                    "AI service unreachable (network/VPN/firewall or Groq outage). "
+                    "AI service unreachable (network/VPN/firewall or OpenAI outage). "
                     "Check you can reach the internet, try disabling VPN, "
-                    "and confirm GROQ_API_KEY is set on the server. "
+                    "and confirm OPENAI_API_KEY is set on the server. "
                     f"({where})"
                 ),
             }
         if isinstance(exc, AuthenticationError):
             return {
                 "sql_query": None,
-                "error": "Groq rejected the API key. Set a valid GROQ_API_KEY in the environment and restart the server.",
+                "error": "OpenAI rejected the API key. Set a valid OPENAI_API_KEY in the environment and restart the server.",
             }
         if isinstance(exc, RateLimitError):
             return {
                 "sql_query": None,
-                "error": "Groq rate limit reached. Wait a minute and try again, or use a tier with higher limits.",
+                "error": "OpenAI rate limit reached. Wait a minute and try again, or use a tier with higher limits.",
             }
         if isinstance(exc, APITimeoutError):
             return {
                 "sql_query": None,
-                "error": "Groq request timed out. Try a shorter question or try again.",
+                "error": "OpenAI request timed out. Try a shorter question or try again.",
             }
         return {
             "sql_query": None,
@@ -272,15 +272,15 @@ class RUDAgent:
         }
 
     def generate_sql(self, user_query: str) -> Dict[str, Any]:
-        """Generate SQL query from natural language using Groq"""
-        if not (os.getenv("GROQ_API_KEY") or "").strip():
+        """Generate SQL query from natural language using OpenAI"""
+        if not (os.getenv("OPENAI_API_KEY") or "").strip():
             return {
                 "sql_query": None,
-                "error": "GROQ_API_KEY is not set. Add it to the server environment (e.g. backend/.env) and restart.",
+                "error": "OPENAI_API_KEY is not set. Add it to the server environment (e.g. backend/.env) and restart.",
             }
         try:
             response = self.client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
+                model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": user_query}
@@ -305,7 +305,7 @@ class RUDAgent:
                 }
         
         except Exception as e:
-            return self._groq_data_error(e, "Groq generate_sql")
+            return self._ai_data_error(e, "OpenAI generate_sql")
 
     def refine_sql(self, user_query: str, failed_sql: str, execution_error: str) -> Dict[str, Any]:
         """Ask the model to repair an invalid SQL query using the schema and runtime error."""
@@ -335,7 +335,7 @@ Remember:
 - include LIMIT 1000
 """
             response = self.client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
+                model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": prompt}
@@ -358,7 +358,7 @@ Remember:
                 "explanation": response_text[:200]
             }
         except Exception as e:
-            err = self._groq_data_error(e, "Groq refine_sql")
+            err = self._ai_data_error(e, "OpenAI refine_sql")
             err["error"] = err.get("error") or f"Error refining SQL: {e}"
             return err
     
@@ -399,7 +399,7 @@ Remember:
         """Return a safe, non-technical fallback answer when exact SQL retrieval fails."""
         try:
             response = self.client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
+                model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
                 messages=[
                     {
                         "role": "system",
@@ -441,7 +441,7 @@ If possible, restate what the user is asking about in business language and sugg
         # Use LLM to generate natural language response
         try:
             response = self.client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
+                model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
                 messages=[
                     {
                         "role": "system",
