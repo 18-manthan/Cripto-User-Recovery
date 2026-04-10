@@ -42,9 +42,9 @@ app.add_middleware(
 
 ADMIN_USERS = {
     "admin@cisinlabs.com": "cisin@321!",
-    "kuldeep@rgcis.ai": "4Ox461O8]ksU",
+    "kuldeep@rgcis.ai": "rgcis#02",
     "manthan@manthan.ai": "123456",
-    "rafael@rgcis.ai": "rafael@rgcis.ai",
+    "rafael@rgcis.ai": "rgcis#02",
 }
 ACTIVE_TOKENS = set()
 
