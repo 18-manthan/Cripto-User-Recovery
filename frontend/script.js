@@ -19,6 +19,186 @@ let appState = {
 };
 let isChatInitialized = false;
 
+// ===== LOGIN (CRYPTO) BACKDROP ANIMATION =====
+let authCanvasState = {
+    canvas: null,
+    ctx: null,
+    rafId: 0,
+    running: false,
+    dpr: 1,
+    w: 0,
+    h: 0,
+    particles: [],
+    lastT: 0,
+    reducedMotion: false,
+};
+
+function prefersReducedMotion() {
+    return typeof window !== 'undefined'
+        && window.matchMedia
+        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function isLoginVisible() {
+    const el = document.getElementById('login-screen');
+    return Boolean(el && !el.classList.contains('auth-hidden'));
+}
+
+function initAuthBackdrop() {
+    const canvas = document.getElementById('auth-canvas');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    authCanvasState.canvas = canvas;
+    authCanvasState.ctx = ctx;
+    authCanvasState.reducedMotion = prefersReducedMotion();
+
+    window.addEventListener('resize', resizeAuthBackdrop, { passive: true });
+    resizeAuthBackdrop();
+    seedAuthParticles();
+
+    if (isLoginVisible()) startAuthBackdrop();
+}
+
+function resizeAuthBackdrop() {
+    const { canvas } = authCanvasState;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    authCanvasState.dpr = dpr;
+    authCanvasState.w = Math.max(1, Math.floor(rect.width));
+    authCanvasState.h = Math.max(1, Math.floor(rect.height));
+
+    canvas.width = Math.floor(authCanvasState.w * dpr);
+    canvas.height = Math.floor(authCanvasState.h * dpr);
+}
+
+function seedAuthParticles() {
+    const { w, h } = authCanvasState;
+    if (!w || !h) return;
+
+    const area = w * h;
+    // Dense "blockchain graph" nodes (no coins).
+    const nodeCount = Math.round(clamp(area / 26000, 18, 46));
+
+    const nodes = Array.from({ length: nodeCount }).map(() => ({
+        kind: 'node',
+        x: Math.random() * w,
+        y: Math.random() * h,
+        vx: (Math.random() - 0.5) * 0.12,
+        vy: (Math.random() - 0.5) * 0.12,
+        r: 2.8 + Math.random() * 3.2,
+        hue: 185 + Math.random() * 18,
+        alpha: 0.62 + Math.random() * 0.28,
+    }));
+    authCanvasState.particles = nodes;
+}
+
+function startAuthBackdrop() {
+    if (authCanvasState.running) return;
+    authCanvasState.running = true;
+    authCanvasState.lastT = performance.now();
+    authCanvasState.rafId = requestAnimationFrame(tickAuthBackdrop);
+}
+
+function stopAuthBackdrop() {
+    authCanvasState.running = false;
+    if (authCanvasState.rafId) cancelAnimationFrame(authCanvasState.rafId);
+    authCanvasState.rafId = 0;
+}
+
+function tickAuthBackdrop(t) {
+    if (!authCanvasState.running) return;
+
+    if (!isLoginVisible()) {
+        stopAuthBackdrop();
+        return;
+    }
+
+    const dt = Math.min(40, Math.max(0, t - (authCanvasState.lastT || t)));
+    authCanvasState.lastT = t;
+
+    drawAuthBackdrop(dt);
+
+    if (authCanvasState.reducedMotion) {
+        stopAuthBackdrop();
+        return;
+    }
+
+    authCanvasState.rafId = requestAnimationFrame(tickAuthBackdrop);
+}
+
+function drawAuthBackdrop(dtMs) {
+    const { ctx, w, h, dpr, particles } = authCanvasState;
+    if (!ctx || !w || !h) return;
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+
+    const dt = dtMs;
+    const nodes = particles.filter(p => p.kind === 'node');
+
+    for (const p of particles) {
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+
+        const pad = 30;
+        if (p.x < -pad) p.x = w + pad;
+        if (p.x > w + pad) p.x = -pad;
+        if (p.y < -pad) p.y = h + pad;
+        if (p.y > h + pad) p.y = -pad;
+    }
+
+    const vg = ctx.createRadialGradient(
+        w * 0.35, h * 0.25, 10,
+        w * 0.5, h * 0.4, Math.max(w, h) * 0.8
+    );
+    vg.addColorStop(0, 'rgba(20, 241, 149, 0.08)');
+    vg.addColorStop(0.45, 'rgba(34, 211, 238, 0.06)');
+    vg.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, w, h);
+
+    const maxDist = Math.max(170, Math.min(300, Math.min(w, h) * 0.30));
+    ctx.lineWidth = 3.5;
+    for (let i = 0; i < nodes.length; i++) {
+        const a = nodes[i];
+        for (let j = i + 1; j < nodes.length; j++) {
+            const b = nodes[j];
+            const dx = a.x - b.x;
+            const dy = a.y - b.y;
+            const d = Math.hypot(dx, dy);
+            if (d > maxDist) continue;
+            const k = 1 - d / maxDist;
+            // Darker + bolder edges (still fades with distance).
+            ctx.strokeStyle = `rgba(28, 120, 150, ${0.26 * k})`;
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.stroke();
+        }
+    }
+
+    for (const n of nodes) {
+        // Bigger nodes with a soft glow ring so the graph reads clearly.
+        const glow = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r * 3.2);
+        glow.addColorStop(0, `hsla(${n.hue} 96% 72% / ${Math.min(1, n.alpha + 0.10)})`);
+        glow.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, n.r * 3.1, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = `hsla(${n.hue} 96% 74% / ${n.alpha})`;
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
 // ===== LIST PAGINATION (Users / Risks / Actions) =====
 const listPagination = {
     risks: { page: 1, pageSize: 10 },
@@ -111,6 +291,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupNavigation();
     setupFilters();
     setupChatInterface();
+    initAuthBackdrop();
 
     if (isAuthenticated()) {
         showApp();
@@ -133,11 +314,13 @@ function showLogin(errorMessage = '') {
     document.getElementById('app-shell')?.classList.add('app-hidden');
     const errorEl = document.getElementById('login-error');
     if (errorEl) errorEl.textContent = errorMessage;
+    if (authCanvasState.canvas) startAuthBackdrop();
 }
 
 function showApp() {
     document.getElementById('login-screen')?.classList.add('auth-hidden');
     document.getElementById('app-shell')?.classList.remove('app-hidden');
+    stopAuthBackdrop();
 }
 
 function clearSession() {

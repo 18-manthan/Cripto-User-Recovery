@@ -478,13 +478,13 @@ If possible, restate what the user is asking about in business language and sugg
 
         # Casual / wellbeing / thanks — phrase match first (before SQL or stiff guardrails)
         _wellbeing = (
-            "I'm doing well, thank you for asking — and I hope you're having a good day as well. "
-            "I'm here to help you work through this RUD demo the way a retention or risk team might look at a crypto exchange or "
+            "I'm doing well, thank you for asking and I hope you're having a good day as well. "
+            "I'm here to help you work through this recovery demo the way a retention or risk team might look at a crypto exchange or "
             "custody book: balances, activity, tickets, and who probably deserves a careful, personal touch. "
             "Whenever you're ready, ask about risk flags, a user id, recovery actions, or portfolio-style metrics."
         )
         _thanks = (
-            "You're very welcome — happy to help. "
+            "You're very welcome, happy to help. "
             "If you'd like to go deeper, we could look at high-value users at-risk, open compliance or withdrawal tickets, "
             "or recovery potential in this demo dataset."
         )
@@ -574,7 +574,7 @@ If possible, restate what the user is asking about in business language and sugg
         if not self.is_relevant_data_query(normalized):
             return self._safe_text_response(
                 user_query,
-                "I specialise in this RUD workspace — think high-value user retention in a crypto-native context: "
+                "I specialise in this workspace — think high-value user retention in a crypto-native context: "
                 "balances and activity as we model them, ticket queues, risk flags, and recovery plays. "
                 "I don't have much to add outside that, but if you point me at a metric, a segment, or a user id in this demo, "
                 "I'll walk through it carefully with you."
