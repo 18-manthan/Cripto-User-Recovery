@@ -7,24 +7,30 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from models import Base
 
-# Postgres-only: require DATABASE_URL to be set explicitly.
-DATABASE_URL = (os.getenv("DATABASE_URL") or "").strip()
-if not DATABASE_URL:
-    raise RuntimeError(
-        "DATABASE_URL is not set. Configure Postgres, e.g. "
-        "postgresql+psycopg2://USER:PASSWORD@HOST:5432/DBNAME"
-    )
-if not (DATABASE_URL.startswith("postgresql://") or DATABASE_URL.startswith("postgresql+psycopg2://")):
-    raise RuntimeError(
-        "This deployment is Postgres-only. DATABASE_URL must start with "
-        "'postgresql://' or 'postgresql+psycopg2://'."
-    )
+def _default_sqlite_url() -> str:
+    """
+    Demo-friendly default DB.
 
-engine = create_engine(
-    DATABASE_URL,
-    echo=False,
-    pool_pre_ping=True,  # Test connections before using them
-)
+    We default to a SQLite file in the backend folder so:
+    - local runs work out-of-the-box
+    - Render / simple VM deploys can run without provisioning Postgres
+    """
+    here = os.path.dirname(os.path.abspath(__file__))
+    return f"sqlite:///{os.path.join(here, 'rud_demo.db')}"
+
+
+DATABASE_URL = (os.getenv("DATABASE_URL") or "").strip() or _default_sqlite_url()
+
+_is_sqlite = DATABASE_URL.startswith("sqlite:")
+engine_kwargs = {
+    "echo": False,
+    "pool_pre_ping": True,  # Test connections before using them
+}
+if _is_sqlite:
+    # Required for SQLite when used in web apps / threads.
+    engine_kwargs["connect_args"] = {"check_same_thread": False}
+
+engine = create_engine(DATABASE_URL, **engine_kwargs)
 
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

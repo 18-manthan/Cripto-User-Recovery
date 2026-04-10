@@ -14,6 +14,15 @@ from typing import Any, Dict, List, Sequence, Tuple
 
 from sqlalchemy.orm import Session
 
+try:
+    from dotenv import load_dotenv
+    from pathlib import Path
+
+    load_dotenv(Path(__file__).resolve().parent / ".env")
+except Exception:
+    # Seeding can still run when env vars are provided by the shell/systemd.
+    pass
+
 from database import SessionLocal, init_db
 from models import UserProfile, Wallet, RiskFlag, SupportTicket, RecoveryAction, Campaign
 
@@ -862,6 +871,9 @@ def insert_user_bundle(
 def seed_demo_personas(db: Session) -> None:
     now = _now()
     for pdata in DEMO_PERSONAS:
+        # Idempotency: skip if already present
+        if db.get(UserProfile, pdata["id"]) is not None:
+            continue
         first_seen = now - timedelta(days=pdata["first_seen_days_ago"])
         last_act = now - timedelta(days=pdata["last_active_days_ago"])
         tickets = [build_ticket(pdata["id"], spec) for spec in pdata["tickets"]]
@@ -880,10 +892,12 @@ def seed_demo_personas(db: Session) -> None:
             tickets=tickets,
         )
     db.commit()
-    print(f"✅ Seeded {len(DEMO_PERSONAS)} named demo personas")
+    print("✅ Seeded named demo personas (skipping existing rows)")
 
 
 def seed_campaigns(db: Session) -> None:
+    # Idempotency: skip inserting rows that already exist
+    existing = {row[0] for row in db.query(Campaign.id).all()}
     campaigns_data = [
         ("campaign_twitter_001", "Twitter Growth Q1", "twitter", 50_000, 1200, 150_000),
         ("campaign_discord_001", "Discord Community Q1", "discord", 25_000, 800, 120_000),
@@ -893,6 +907,8 @@ def seed_campaigns(db: Session) -> None:
         ("campaign_content_001", "Content Marketing Q1", "content", 30_000, 1500, 200_000),
     ]
     for camp_id, name, channel, spend, conversions, revenue in campaigns_data:
+        if camp_id in existing:
+            continue
         cpa = spend / conversions if conversions > 0 else 0.0
         roi = (revenue - spend) / spend * 100 if spend > 0 else 0.0
         db.add(
@@ -911,11 +927,16 @@ def seed_campaigns(db: Session) -> None:
             )
         )
     db.commit()
-    print(f"✅ Created {len(campaigns_data)} campaigns")
+    print("✅ Seeded campaigns (skipping existing rows)")
 
 
 def seed_procedural_users(db: Session, count: int) -> None:
     print(f"🌱 Seeding {count} procedural users (deterministic rules)…")
+    # Idempotency: if procedural users already exist, do not append more.
+    existing_proc = db.query(UserProfile.id).filter(UserProfile.id.like("proc_%")).first()
+    if existing_proc:
+        print("  ↪ Procedural users already exist; skipping.")
+        return
     now = _now()
     for i in range(count):
         user_id = f"proc_{i:06d}"
