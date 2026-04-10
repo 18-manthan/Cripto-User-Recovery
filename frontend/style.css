@@ -1428,7 +1428,9 @@ button:disabled {
 @media (max-width: 540px) {
     .auth-corner-brand {
         top: 16px;
-        left: 16px;
+        left: 50%;
+        right: auto;
+        transform: translateX(-50%);
     }
 
     .brand-logo-img--corner {
