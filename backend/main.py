@@ -40,8 +40,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-ADMIN_EMAIL = "admin@cisinlabs.com"
-ADMIN_PASSWORD = "cisin@321!"
+ADMIN_USERS = {
+    "admin@cisinlabs.com": "cisin@321!",
+    "kuldeep@rgcis.ai": "4Ox461O8]ksU",
+    "manthan@manthan.ai": "123456",
+    "rafael@rgcis.ai": "rafael@rgcis.ai",
+}
 ACTIVE_TOKENS = set()
 
 
@@ -154,10 +158,11 @@ async def startup_event():
 @app.post("/api/login", response_model=LoginResponse)
 async def login(request: LoginRequest):
     """Demo login endpoint for the dashboard."""
-    if request.email == ADMIN_EMAIL and request.password == ADMIN_PASSWORD:
+    expected_password = ADMIN_USERS.get(request.email)
+    if expected_password and request.password == expected_password:
         token = str(uuid.uuid4())
         ACTIVE_TOKENS.add(token)
-        return LoginResponse(success=True, token=token, user=ADMIN_EMAIL)
+        return LoginResponse(success=True, token=token, user=request.email)
 
     return LoginResponse(success=False, error="Invalid email or password")
 

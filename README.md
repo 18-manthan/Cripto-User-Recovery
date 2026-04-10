@@ -50,8 +50,6 @@ sudo systemctl restart rud-demo
 sudo systemctl status rud-demo --no-pager
 ```
 
-## Demo login
-- Email: `admin@cisinlabs.com`
-- Password: `cisin@321!`
+
 
 
