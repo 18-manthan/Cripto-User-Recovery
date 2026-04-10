@@ -95,6 +95,20 @@ body::after {
     overflow: hidden;
 }
 
+.auth-corner-brand {
+    position: absolute;
+    top: 24px;
+    left: 24px;
+    z-index: 2;
+    pointer-events: none;
+}
+
+.brand-logo-img--corner {
+    height: auto;
+    width: min(320px, 44vw);
+    max-height: 86px;
+}
+
 .auth-canvas {
     position: absolute;
     inset: 0;
@@ -178,7 +192,7 @@ body::after {
 
 .auth-card {
     width: min(460px, 100%);
-    padding: 2rem;
+    padding: 2.1rem 2rem 2rem;
     border-radius: 28px;
     border: 1px solid var(--line);
     background:
@@ -190,25 +204,31 @@ body::after {
 
 .auth-brand {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 1rem;
-    margin-bottom: 1.8rem;
+    text-align: center;
+    gap: 0.9rem;
+    margin-bottom: 1.6rem;
 }
 
 .auth-logo-shell {
     flex-shrink: 0;
+    width: 220px;
+    height: 80px;
 }
 
 .auth-copy h1 {
     margin-bottom: 0.4rem;
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 1.9rem;
+    font-size: clamp(1.45rem, 1.8vw, 1.9rem);
+    line-height: 1.12;
     color: #f8fbff;
 }
 
 .auth-copy p {
     color: var(--text-muted);
     line-height: 1.6;
+    max-width: 44ch;
 }
 
 .auth-form {
@@ -334,22 +354,44 @@ body::after {
 }
 
 .brand-logo-shell {
-    width: 72px;
-    height: 72px;
+    /* Legacy wrapper (kept for compatibility, but visually neutral). */
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 10px;
-    border-radius: 22px;
-    background: linear-gradient(180deg, rgba(34, 211, 238, 0.16), rgba(20, 241, 149, 0.12));
-    border: 1px solid rgba(110, 231, 255, 0.2);
-    box-shadow: 0 12px 30px rgba(4, 12, 24, 0.45);
+    padding: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
 }
 
 .brand-logo {
     width: 100%;
     height: 100%;
     display: block;
+}
+
+.brand-logo-img {
+    width: auto;
+    height: 56px;
+    display: block;
+    filter:
+        drop-shadow(0 12px 22px rgba(0, 0, 0, 0.40))
+        drop-shadow(0 0 22px rgba(34, 211, 238, 0.06));
+}
+
+.brand-logo--img {
+    object-fit: contain;
+}
+
+.brand-logo-img--header {
+    height: 56px;
+}
+
+.brand-logo-img--auth {
+    width: min(340px, 82%);
+    height: auto;
+    max-height: 96px;
+    flex-shrink: 0;
 }
 
 .brand-title {
@@ -1345,10 +1387,8 @@ button:disabled {
         align-items: flex-start;
     }
 
-    .brand-logo-shell {
-        width: 60px;
-        height: 60px;
-        border-radius: 18px;
+    .brand-logo-img--header {
+        height: 50px;
     }
 
     .health-status {
@@ -1386,12 +1426,27 @@ button:disabled {
 }
 
 @media (max-width: 540px) {
+    .auth-corner-brand {
+        top: 16px;
+        left: 16px;
+    }
+
+    .brand-logo-img--corner {
+        width: min(260px, 62vw);
+        max-height: 72px;
+    }
+
     .nav-menu {
         grid-template-columns: 1fr;
     }
 
     .brand-title {
         font-size: 1.5rem;
+    }
+
+    .brand-logo-img--auth {
+        width: min(300px, 86%);
+        max-height: 84px;
     }
 
     .brand-subtitle {
