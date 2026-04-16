@@ -462,7 +462,6 @@ async function loadDashboardData() {
         
     } catch (error) {
         console.error('❌ Error loading data:', error);
-        showError('Failed to load dashboard data');
     }
 }
 
@@ -860,7 +859,7 @@ async function approveAction(actionId) {
         }
     } catch (error) {
         console.error('Error approving action:', error);
-        showError('Failed to approve action');
+
     }
 }
 
@@ -877,7 +876,7 @@ async function executeAction(actionId) {
         }
     } catch (error) {
         console.error('Error executing action:', error);
-        showError('Failed to execute action');
+
     }
 }
 
@@ -982,7 +981,7 @@ async function viewUserDetail(userId) {
         
     } catch (error) {
         console.error('Error loading user details:', error);
-        showError('Failed to load user details');
+    
     }
 }
 
