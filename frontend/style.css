@@ -384,7 +384,7 @@ body::after {
 }
 
 .brand-logo-img--header {
-    height: 56px;
+    height: 45px;
 }
 
 .brand-logo-img--auth {
@@ -396,7 +396,7 @@ body::after {
 
 .brand-title {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: clamp(1.7rem, 2vw, 2.35rem);
+    font-size: 26px;
     line-height: 1.06;
     color: #f8fbff;
     letter-spacing: -0.04em;

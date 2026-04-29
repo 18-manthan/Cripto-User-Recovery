@@ -332,7 +332,7 @@ function showApp() {
 
     // Restore admin navigation visibility.
     document.querySelectorAll('.nav-item').forEach((item) => {
-        if (item.dataset.section === 'portfolio') item.style.display = 'none';
+        if (item.dataset.section === 'portfolio' || item.dataset.section === 'integrations') item.style.display = 'none';
         else item.style.display = '';
     });
 
@@ -1222,6 +1222,37 @@ let clientBotsRestored = false;
 let clientBotUiBound = false;
 let clientBotEditingId = null;
 
+function resetClientDemo() {
+    const ok = confirm('Reset demo data? This will restore the original portfolio holdings and clear bots + bot activity + connector logs.');
+    if (!ok) return;
+
+    Object.values(clientBotIntervals).forEach((intervalId) => {
+        try {
+            clearInterval(intervalId);
+        } catch (e) {
+            // ignore
+        }
+    });
+
+    clientBotIntervals = {};
+    clientBotExpandedPanels = {};
+    clientBotsRestored = false;
+    clientBotEditingId = null;
+
+    localStorage.removeItem(CLIENT_PORTFOLIO_HOLDINGS_KEY);
+    localStorage.removeItem(CLIENT_BOTS_KEY);
+    localStorage.removeItem(CLIENT_BOT_EVENTS_KEY);
+    localStorage.removeItem(CLIENT_BOT_FORM_ASSETS_KEY);
+    localStorage.removeItem(CLIENT_CONNECTOR_STATE_KEY);
+    localStorage.removeItem(CLIENT_CONNECTOR_SYNC_LOG_KEY);
+
+    renderPortfolio();
+    renderBotsUI();
+    renderBotActivityUI();
+    renderConnectorsDemo();
+    renderConnectorSyncLog();
+}
+
 // ===== Connectors (Demo-only UI) =====
 const CLIENT_CONNECTOR_STATE_KEY = 'rud_client_connectors';
 const CLIENT_CONNECTOR_SYNC_LOG_KEY = 'rud_client_connector_sync_log';
@@ -1552,7 +1583,8 @@ function normalizeBots(bots) {
         return {
             id,
             name: String(b.name || 'Bot'),
-            assets: Array.isArray(b.assets) ? b.assets : [],
+            // USDC is treated as cash; exclude it from tradable assets.
+            assets: Array.isArray(b.assets) ? b.assets.filter((s) => String(s) !== 'USDC') : [],
             mode: b.mode || 'both',
             strategy: b.strategy || 'both',
             intensity: b.intensity || 'medium',
@@ -1749,7 +1781,8 @@ function renderBotAssetsSelector(trackedCoins) {
     const container = document.getElementById('bot-assets-select');
     if (!container) return;
 
-    const coins = Array.from(new Set((trackedCoins || []).map((c) => String(c)).filter(Boolean)));
+    // USDC is treated as cash; hide it from tradable assets.
+    const coins = Array.from(new Set((trackedCoins || []).map((c) => String(c)).filter(Boolean))).filter((c) => c !== 'USDC');
     const stored = new Set(getBotFormAssetsSelection());
     // Default: select all tracked coins when nothing stored yet.
     if (stored.size === 0) coins.forEach((c) => stored.add(c));
@@ -2184,6 +2217,7 @@ function simulateBotTick(botId) {
     simulateMarketPrices(holdings, actionableSymbols, bot.intensity);
 
     const symbol = actionableSymbols[Math.floor(Math.random() * actionableSymbols.length)];
+    if (symbol === 'USDC') return; // USDC is cash; not tradable
     const holding = getClientHoldingsBySymbol(holdings, symbol);
     if (!holding) return;
 
@@ -2501,6 +2535,7 @@ function simulateBotOneCyclePreview() {
     simulateMarketPrices(holdings, actionableSymbols, cfg.intensity);
 
     const symbol = actionableSymbols[Math.floor(Math.random() * actionableSymbols.length)];
+    if (symbol === 'USDC') return; // USDC is cash; not tradable
     const holding = getClientHoldingsBySymbol(holdings, symbol);
     if (!holding) return;
 

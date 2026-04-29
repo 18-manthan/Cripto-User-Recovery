@@ -228,8 +228,15 @@
                 <!-- Portfolio Section (client-facing, demo-only UI) -->
                 <section id="portfolio" class="panel">
                     <div class="panel-header">
-                        <h2><i class="fas fa-wallet"></i> Client Portfolio</h2>
-                        <p class="section-help">Demo-only portfolio view: no real trading or external integrations.</p>
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; width:100%;">
+                            <div>
+                                <h2><i class="fas fa-wallet"></i> Client Portfolio</h2>
+                                <p class="section-help">Demo-only portfolio view: no real trading or external integrations.</p>
+                            </div>
+                            <div style="display:flex; gap:0.7rem; flex-wrap:wrap;">
+                                <button type="button" class="btn-secondary" onclick="resetClientDemo()">Reset Demo</button>
+                            </div>
+                        </div>
                     </div>
 
                     <div id="portfolio-summary" class="portfolio-summary-grid"></div>
