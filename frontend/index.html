@@ -25,6 +25,11 @@
                 </div>
             </div>
 
+            <div class="auth-mode-toggle" role="tablist" aria-label="Login mode">
+                <button type="button" id="login-as-admin" class="auth-mode-btn active" role="tab" aria-selected="true">Admin</button>
+                <button type="button" id="login-as-client" class="auth-mode-btn" role="tab" aria-selected="false">Client</button>
+            </div>
+
             <form id="login-form" class="auth-form">
                 <label class="auth-field">
                     <span>Email</span>
@@ -36,6 +41,20 @@
                 </label>
                 <p id="login-error" class="auth-error" aria-live="polite"></p>
                 <button type="submit" class="auth-submit">Sign In</button>
+            </form>
+
+            <form id="client-login-form" class="auth-form auth-form-client" style="display:none;">
+                <label class="auth-field">
+                    <span>Email</span>
+                    <input type="email" id="client-login-email" class="auth-input" placeholder="client@demo.com" autocomplete="username" required>
+                </label>
+                <label class="auth-field">
+                    <span>Password</span>
+                    <input type="password" id="client-login-password" class="auth-input" placeholder="demo" autocomplete="current-password" required>
+                </label>
+                <p class="auth-error" id="client-login-error" aria-live="polite"></p>
+                <button type="submit" class="auth-submit">Enter Portfolio</button>
+                <p class="auth-help-text">Demo credentials: <code>client@demo.com</code> / <code>demo</code></p>
             </form>
         </div>
     </div>
@@ -92,6 +111,12 @@
                     </a>
                     <a href="#" data-section="users" class="nav-item">
                         <i class="fas fa-users icon"></i> Users
+                    </a>
+                    <a href="#" data-section="portfolio" class="nav-item client-only" style="display:none;">
+                        <i class="fas fa-wallet icon"></i> Portfolio
+                    </a>
+                    <a href="#" data-section="integrations" class="nav-item client-only" style="display:none;">
+                        <i class="fas fa-plug icon"></i> Integrations
                     </a>
                     <a href="#" data-section="chat" class="nav-item">
                         <i class="fas fa-comments icon"></i> AI Chat
@@ -198,6 +223,155 @@
                     </div>
                     <div id="users-list" class="list-container"></div>
                     <div id="users-pagination" class="list-pagination" aria-label="Users pagination"></div>
+                </section>
+
+                <!-- Portfolio Section (client-facing, demo-only UI) -->
+                <section id="portfolio" class="panel">
+                    <div class="panel-header">
+                        <h2><i class="fas fa-wallet"></i> Client Portfolio</h2>
+                        <p class="section-help">Demo-only portfolio view: no real trading or external integrations.</p>
+                    </div>
+
+                    <div id="portfolio-summary" class="portfolio-summary-grid"></div>
+
+                    <div class="portfolio-grid">
+                        <div class="overview-card portfolio-card">
+                            <h3><i class="fas fa-coins"></i> Holdings</h3>
+                            <div class="portfolio-table-wrap">
+                                <table class="portfolio-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Coin</th>
+                                            <th>Qty</th>
+                                            <th>Price</th>
+                                            <th>Value</th>
+                                            <th>24h</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="portfolio-holdings-tbody"></tbody>
+                                </table>
+                            </div>
+                            <p class="portfolio-note">Tip: Use “Track coins” to decide which coins to highlight in the dashboard.</p>
+                        </div>
+
+                        <div class="overview-card portfolio-card">
+                            <h3><i class="fas fa-thumbtack"></i> Track coins</h3>
+                            <div id="portfolio-track-tips" class="portfolio-track-tips"></div>
+                            <div class="portfolio-track-list" id="portfolio-track-list"></div>
+                        </div>
+
+                        <div class="overview-card portfolio-card portfolio-card-wide">
+                            <h3><i class="fas fa-robot"></i> Bot Simulator (Demo)</h3>
+
+                            <div class="bot-form-grid">
+                                <label class="bot-field">
+                                    <span>Bot name</span>
+                                    <input type="text" id="bot-name" class="bot-input" value="Erase Me and give a name to your bot..." />
+                                </label>
+
+                                <div class="bot-field">
+                                    <span>Assets (from tracked list)</span>
+                                    <div id="bot-assets-select" class="bot-assets-select"></div>
+                                </div>
+
+                                <label class="bot-field">
+                                    <span>Mode</span>
+                                    <select id="bot-mode" class="bot-input">
+                                        <option value="buy">Buy</option>
+                                        <option value="sell">Sell</option>
+                                        <option value="both" selected>Both</option>
+                                    </select>
+                                </label>
+
+                                <label class="bot-field">
+                                    <span>Strategy</span>
+                                    <select id="bot-strategy" class="bot-input">
+                                        <option value="threshold">Threshold</option>
+                                        <option value="dca">DCA</option>
+                                        <option value="both" selected>Both (Threshold / DCA)</option>
+                                    </select>
+                                </label>
+
+                                <label class="bot-field">
+                                    <span>Intensity</span>
+                                    <select id="bot-intensity" class="bot-input">
+                                        <option value="low">Low</option>
+                                        <option value="medium" selected>Medium</option>
+                                        <option value="high">High</option>
+                                    </select>
+                                </label>
+
+                                <label class="bot-field">
+                                    <span>Trade size mode</span>
+                                    <select id="bot-trade-size-mode" class="bot-input">
+                                        <option value="fixed_usd" selected>Fixed USD</option>
+                                        <option value="percent">Percent</option>
+                                    </select>
+                                </label>
+
+                                <label class="bot-field">
+                                    <span>Trade size</span>
+                                    <input type="number" id="bot-trade-size" class="bot-input" value="500" min="1" step="1" />
+                                </label>
+
+                                <label class="bot-field">
+                                    <span>Execution interval</span>
+                                    <select id="bot-interval" class="bot-input">
+                                        <option value="5000">Every 5s</option>
+                                        <option value="10000" selected>Every 10s</option>
+                                        <option value="30000">Every 30s</option>
+                                    </select>
+                                </label>
+
+                                <label class="bot-field">
+                                    <span>Min USDC balance (buy guard)</span>
+                                    <input type="number" id="bot-min-usdc" class="bot-input" value="250" min="0" step="1" />
+                                </label>
+
+                                <label class="bot-field">
+                                    <span>Max exposure per asset (%)</span>
+                                    <input type="number" id="bot-max-exposure" class="bot-input" value="45" min="5" max="100" step="1" />
+                                </label>
+
+                                <div class="bot-field bot-field-actions">
+                                    <button type="button" id="bot-create-btn" class="btn-primary">Create Bot</button>
+                                    <button type="button" id="bot-cancel-edit-btn" class="btn-secondary" style="display:none;">Cancel edit</button>
+                                    <button type="button" id="bot-simulate-one-btn" class="btn-secondary">Simulate One Cycle</button>
+                                </div>
+                            </div>
+
+                            <div class="portfolio-bots-wrap">
+                                <h4>Created bots</h4>
+                                <div id="portfolio-bots-list" class="portfolio-bots-list"></div>
+                            </div>
+
+                            <div class="portfolio-bot-activity-wrap">
+                                <h4>Bot activity (mock)</h4>
+                                <div id="portfolio-bot-activity" class="portfolio-bot-activity"></div>
+                            </div>
+
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Integrations Section (client-facing, demo-only UI) -->
+                <section id="integrations" class="panel">
+                    <div class="panel-header">
+                        <h2><i class="fas fa-plug"></i> Integrations (Demo)</h2>
+                        <p class="section-help">UI-only connectors to show “plug & play” integration capability. No real API calls are made.</p>
+                    </div>
+                    <div class="connector-topbar">
+                        <div class="connector-topbar-left">
+                            <div class="connector-topbar-title">Sync center</div>
+                            <div id="connector-sync-subtitle" class="connector-topbar-subtitle">Connect a provider, then run a demo sync.</div>
+                        </div>
+                        <div class="connector-topbar-actions">
+                            <button type="button" class="btn-secondary" onclick="runAllConnectorSync()">Sync all (demo)</button>
+                            <button type="button" class="btn-secondary" onclick="clearConnectorSyncLog()">Clear log</button>
+                        </div>
+                    </div>
+                    <div id="connector-sync-log" class="connector-sync-log"></div>
+                    <div id="portfolio-connectors-list" class="connector-list"></div>
                 </section>
 
                 <!-- AI Chat Section -->

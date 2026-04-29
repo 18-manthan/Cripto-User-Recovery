@@ -5,6 +5,7 @@ const API_BASE = (typeof window !== 'undefined' && window.RUD_API_BASE)
     ? `${String(window.RUD_API_BASE).replace(/\/$/, '')}/api`
     : `${window.location.origin}/api`;
 const AUTH_TOKEN_KEY = 'rud_admin_token';
+const CLIENT_AUTH_TOKEN_KEY = 'rud_client_token';
 
 // ===== STATE =====
 let appState = {
@@ -18,6 +19,7 @@ let appState = {
     filteredUsers: []
 };
 let isChatInitialized = false;
+let uiMode = 'admin'; // 'admin' | 'client'
 
 // ===== LOGIN (CRYPTO) BACKDROP ANIMATION =====
 let authCanvasState = {
@@ -285,15 +287,19 @@ function renderListPagination({ key, mountId, total, page, totalPages, pageSize 
 
 // ===== INITIALIZATION =====
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('🚀 RUD Demo Dashboard loading...');
+    console.log('🚀 Demo Dashboard loading...');
 
     setupAuth();
+    setupClientAuth();
     setupNavigation();
     setupFilters();
     setupChatInterface();
     initAuthBackdrop();
 
-    if (isAuthenticated()) {
+    if (isClientAuthenticated()) {
+        showClientApp();
+        renderPortfolio();
+    } else if (isAuthenticated()) {
         showApp();
         await initializeApp();
     } else {
@@ -314,13 +320,33 @@ function showLogin(errorMessage = '') {
     document.getElementById('app-shell')?.classList.add('app-hidden');
     const errorEl = document.getElementById('login-error');
     if (errorEl) errorEl.textContent = errorMessage;
+    setLoginMode('admin');
     if (authCanvasState.canvas) startAuthBackdrop();
 }
 
 function showApp() {
+    uiMode = 'admin';
     document.getElementById('login-screen')?.classList.add('auth-hidden');
     document.getElementById('app-shell')?.classList.remove('app-hidden');
     stopAuthBackdrop();
+
+    // Restore admin navigation visibility.
+    document.querySelectorAll('.nav-item').forEach((item) => {
+        if (item.dataset.section === 'portfolio') item.style.display = 'none';
+        else item.style.display = '';
+    });
+
+    document.querySelectorAll('.panel').forEach((p) => p.classList.remove('active'));
+    document.getElementById('overview')?.classList.add('active');
+
+    // Ensure header widgets are visible on default admin landing (Overview).
+    const statsSection = document.getElementById('stats-section');
+    const healthStatus = document.querySelector('.health-status');
+    if (statsSection) statsSection.style.display = '';
+    if (healthStatus) healthStatus.style.display = '';
+
+    document.querySelectorAll('.nav-item').forEach((item) => item.classList.remove('active'));
+    document.querySelector('.nav-item[data-section="overview"]')?.classList.add('active');
 }
 
 function clearSession() {
@@ -369,8 +395,104 @@ async function handleLogin(event) {
 }
 
 function handleLogout() {
+    localStorage.removeItem(CLIENT_AUTH_TOKEN_KEY);
     clearSession();
     showLogin();
+}
+
+function getClientAuthToken() {
+    return localStorage.getItem(CLIENT_AUTH_TOKEN_KEY) || '';
+}
+
+function isClientAuthenticated() {
+    return Boolean(getClientAuthToken());
+}
+
+function setLoginMode(mode) {
+    const adminBtn = document.getElementById('login-as-admin');
+    const clientBtn = document.getElementById('login-as-client');
+    const adminForm = document.getElementById('login-form');
+    const clientForm = document.getElementById('client-login-form');
+    const clientErrorEl = document.getElementById('client-login-error');
+
+    if (!adminBtn || !clientBtn || !adminForm || !clientForm) return;
+
+    if (clientErrorEl) clientErrorEl.textContent = '';
+
+    if (mode === 'client') {
+        adminBtn.classList.remove('active');
+        clientBtn.classList.add('active');
+        adminForm.style.display = 'none';
+        clientForm.style.display = '';
+        clientBtn.setAttribute('aria-selected', 'true');
+        adminBtn.setAttribute('aria-selected', 'false');
+    } else {
+        clientBtn.classList.remove('active');
+        adminBtn.classList.add('active');
+        clientForm.style.display = 'none';
+        adminForm.style.display = '';
+        adminBtn.setAttribute('aria-selected', 'true');
+        clientBtn.setAttribute('aria-selected', 'false');
+    }
+}
+
+function showClientApp() {
+    uiMode = 'client';
+    document.getElementById('login-screen')?.classList.add('auth-hidden');
+    document.getElementById('app-shell')?.classList.remove('app-hidden');
+    stopAuthBackdrop();
+
+    // Client demo mode does not load backend dashboard stats/health.
+    // Remove the initial "Initializing..." UI so it doesn't look stuck.
+    const indicator = document.getElementById('status-indicator');
+    const text = document.getElementById('status-text');
+    indicator?.classList.remove('loading');
+    indicator?.classList.add('healthy');
+    if (text) text.textContent = 'Client Demo Ready';
+
+    // Hide top header widgets (stats grid + health banner) in client mode.
+    hideTopHeaderWidgets();
+
+    // Show only client nav items (Portfolio + Integrations).
+    document.querySelectorAll('.nav-item').forEach((item) => {
+        if (item.dataset.section === 'portfolio' || item.dataset.section === 'integrations') item.style.display = '';
+        else item.style.display = 'none';
+    });
+
+    // Activate default portfolio panel.
+    document.querySelectorAll('.panel').forEach((p) => p.classList.remove('active'));
+    document.getElementById('portfolio')?.classList.add('active');
+
+    document.querySelectorAll('.nav-item').forEach((item) => item.classList.remove('active'));
+    document.querySelector('.nav-item[data-section="portfolio"]')?.classList.add('active');
+}
+
+function setupClientAuth() {
+    const clientForm = document.getElementById('client-login-form');
+    const clientErrorEl = document.getElementById('client-login-error');
+    const loginAsAdminBtn = document.getElementById('login-as-admin');
+    const loginAsClientBtn = document.getElementById('login-as-client');
+
+    loginAsAdminBtn?.addEventListener('click', () => setLoginMode('admin'));
+    loginAsClientBtn?.addEventListener('click', () => setLoginMode('client'));
+
+    clientForm?.addEventListener('submit', (event) => {
+        event.preventDefault();
+        if (clientErrorEl) clientErrorEl.textContent = '';
+
+        const email = document.getElementById('client-login-email')?.value.trim() || '';
+        const password = document.getElementById('client-login-password')?.value || '';
+
+        // Demo-only client auth (no backend).
+        if (email === 'client@demo.com' && password === 'demo') {
+            localStorage.setItem(CLIENT_AUTH_TOKEN_KEY, String(Math.random()).slice(2));
+            setLoginMode('client');
+            showClientApp();
+            renderPortfolio();
+        } else {
+            if (clientErrorEl) clientErrorEl.textContent = 'Invalid client credentials. Use client@demo.com / demo.';
+        }
+    });
 }
 
 async function initializeApp() {
@@ -401,6 +523,27 @@ async function apiFetch(url, options = {}) {
 
 // ===== NAVIGATION =====
 function setupNavigation() {
+    function applyHeaderVisibilityForSection(section) {
+        const statsSection = document.getElementById('stats-section');
+        const healthStatus = document.querySelector('.health-status');
+
+        // Client mode: keep header widgets hidden for a cleaner demo experience.
+        if (uiMode === 'client') {
+            if (statsSection) statsSection.style.display = 'none';
+            if (healthStatus) healthStatus.style.display = 'none';
+            return;
+        }
+
+        // Hide top header widgets only on the Users screen (cleaner UX for profile browsing).
+        if (section === 'users') {
+            if (statsSection) statsSection.style.display = 'none';
+            if (healthStatus) healthStatus.style.display = 'none';
+        } else {
+            if (statsSection) statsSection.style.display = '';
+            if (healthStatus) healthStatus.style.display = '';
+        }
+    }
+
     document.querySelectorAll('.nav-item').forEach(item => {
         item.addEventListener('click', (e) => {
             e.preventDefault();
@@ -411,6 +554,8 @@ function setupNavigation() {
             item.classList.add('active');
             const section = item.dataset.section;
             document.getElementById(section).classList.add('active');
+
+            applyHeaderVisibilityForSection(section);
             
             // Render section content
             if (section === 'overview') renderOverview();
@@ -418,9 +563,18 @@ function setupNavigation() {
             else if (section === 'actions') renderActions();
             else if (section === 'scenarios') renderScenarios();
             else if (section === 'users') renderUsers();
+            else if (section === 'portfolio') renderPortfolio();
+            else if (section === 'integrations') renderIntegrations();
             else if (section === 'chat') renderChat();
         });
     });
+}
+
+function renderIntegrations() {
+    // Client-only panel, but harmless in admin too.
+    hideTopHeaderWidgets();
+    renderConnectorSyncLog();
+    renderConnectorsDemo();
 }
 
 // Render chat panel when switched to
@@ -435,6 +589,25 @@ function renderChat() {
 // ===== DATA LOADING =====
 async function loadDashboardData() {
     try {
+        // Avoid leaving widgets in their initial "loading" state forever.
+        appState.stats = appState.stats || {
+            total_users: 0,
+            total_risk_flags: 0,
+            total_actions: 0,
+            total_recovery_potential: 0,
+            avg_recovery_value_per_action: 0,
+            user_status_breakdown: {},
+            risk_severity_breakdown: {},
+            action_status_breakdown: {},
+        };
+        appState.riskFlags = appState.riskFlags || [];
+        appState.filteredRisks = appState.filteredRisks || appState.riskFlags;
+        appState.actions = appState.actions || [];
+        appState.filteredActions = appState.filteredActions || appState.actions;
+        appState.scenarios = appState.scenarios || {};
+
+        renderStats();
+
         // Load all data in parallel
         const [statsRes, risksRes, actionsRes, scenariosRes] = await Promise.all([
             apiFetch(`${API_BASE}/dashboard/stats`),
@@ -462,6 +635,22 @@ async function loadDashboardData() {
         
     } catch (error) {
         console.error('❌ Error loading data:', error);
+        appState.stats = appState.stats || {
+            total_users: 0,
+            total_risk_flags: 0,
+            total_actions: 0,
+            total_recovery_potential: 0,
+            avg_recovery_value_per_action: 0,
+            user_status_breakdown: {},
+            risk_severity_breakdown: {},
+            action_status_breakdown: {},
+        };
+        appState.riskFlags = [];
+        appState.filteredRisks = [];
+        appState.actions = [];
+        appState.filteredActions = [];
+        appState.scenarios = {};
+        renderStats();
     }
 }
 
@@ -489,6 +678,11 @@ async function updateHealthStatus() {
         
     } catch (error) {
         console.error('Health check failed:', error);
+        const indicator = document.getElementById('status-indicator');
+        const text = document.getElementById('status-text');
+        indicator?.classList.remove('loading');
+        indicator?.classList.add('healthy');
+        if (text) text.textContent = 'System Ready (demo)';
     }
 }
 
@@ -532,10 +726,25 @@ function renderStats() {
 
 // ===== OVERVIEW RENDERING =====
 function renderOverview() {
+    showTopHeaderWidgets();
     renderUserStatusChart();
     renderSeverityChart();
     renderRecoveryMetrics();
     renderActionSummary();
+}
+
+function hideTopHeaderWidgets() {
+    const statsSection = document.getElementById('stats-section');
+    const healthStatus = document.querySelector('.health-status');
+    if (statsSection) statsSection.style.display = 'none';
+    if (healthStatus) healthStatus.style.display = 'none';
+}
+
+function showTopHeaderWidgets() {
+    const statsSection = document.getElementById('stats-section');
+    const healthStatus = document.querySelector('.health-status');
+    if (statsSection) statsSection.style.display = '';
+    if (healthStatus) healthStatus.style.display = '';
 }
 
 function renderUserStatusChart() {
@@ -625,6 +834,7 @@ function renderActionSummary() {
 
 // ===== RISK FLAGS RENDERING =====
 function renderRiskFlags() {
+    showTopHeaderWidgets();
     const container = document.getElementById('risk-flags-list');
     const paginationMountId = 'risk-flags-pagination';
     
@@ -670,6 +880,7 @@ function renderRiskFlags() {
 
 // ===== ACTIONS RENDERING =====
 function renderActions() {
+    showTopHeaderWidgets();
     const container = document.getElementById('actions-list');
     const paginationMountId = 'actions-pagination';
     
@@ -723,6 +934,7 @@ function renderActions() {
 
 // ===== SCENARIOS RENDERING =====
 function renderScenarios() {
+    showTopHeaderWidgets();
     const container = document.getElementById('scenarios-grid');
     const scenarios = appState.scenarios?.scenarios || {};
     
@@ -758,7 +970,146 @@ function renderScenarios() {
 }
 
 // ===== USERS RENDERING =====
+let inlineExpandedUserId = null;
+const inlineUserProfileCache = {};
+
+function safeDomId(value) {
+    return String(value).replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+function buildUserProfileInlineHtml(data) {
+    const user = data.user || {};
+    const wallet = data.wallet || null;
+
+    const escape = (t) => escapeHtml(String(t ?? ''));
+
+    let html = `
+        <div class="user-profile-inline-sections">
+            <div class="user-profile-inline-title">
+                ${escapeHtml(user.name || user.id || 'User')}
+            </div>
+            
+            <div class="user-detail-section">
+                <h3>Profile</h3>
+                <div class="detail-row"><span class="detail-label">User ID:</span><span class="detail-value">${escapeHtml(user.id || '')}</span></div>
+                <div class="detail-row"><span class="detail-label">Email:</span><span class="detail-value">${escapeHtml(user.email || '')}</span></div>
+                <div class="detail-row"><span class="detail-label">Lifecycle Stage:</span><span class="detail-value">${escapeHtml(user.lifecycle_stage || '')}</span></div>
+                <div class="detail-row"><span class="detail-label">Country:</span><span class="detail-value">${escapeHtml(user.country || '')}</span></div>
+                <div class="detail-row"><span class="detail-label">Acquisition Source:</span><span class="detail-value">${escapeHtml(user.acquisition_source || '')}</span></div>
+                <div class="detail-row"><span class="detail-label">Estimated LTV:</span><span class="detail-value">$${Number(user.estimated_ltv || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span></div>
+                <div class="detail-row"><span class="detail-label">Last Active:</span><span class="detail-value">${user.last_activity_at ? escapeHtml(new Date(user.last_activity_at).toLocaleDateString()) : 'N/A'}</span></div>
+            </div>
+    `;
+
+    if (wallet) {
+        html += `
+            <div class="user-detail-section">
+                <h3>Wallet</h3>
+                <div class="detail-row"><span class="detail-label">Blockchain:</span><span class="detail-value">${escapeHtml(wallet.blockchain || '')}</span></div>
+                <div class="detail-row"><span class="detail-label">Balance:</span><span class="detail-value">$${wallet.balance_usd ? escapeHtml(Number(wallet.balance_usd).toLocaleString()) : '0'}</span></div>
+                <div class="detail-row"><span class="detail-label">Activity Score:</span><span class="detail-value">${Number(wallet.activity_score || 0).toFixed(1)}/100</span></div>
+                <div class="detail-row"><span class="detail-label">Transactions:</span><span class="detail-value">${wallet.transaction_count || 0}</span></div>
+                <div class="detail-row"><span class="detail-label">Wallet Age:</span><span class="detail-value">${wallet.wallet_age_days || 0} days</span></div>
+            </div>
+        `;
+    }
+
+    const tickets = Array.isArray(data.tickets) ? data.tickets : [];
+    const riskFlags = Array.isArray(data.risk_flags) ? data.risk_flags : [];
+    const actions = Array.isArray(data.recovery_actions) ? data.recovery_actions : [];
+
+    if (tickets.length) {
+        html += `
+            <div class="user-detail-section">
+                <h3>Support Tickets (${tickets.length})</h3>
+                ${tickets.map((ticket) => `
+                    <div style="margin-bottom: 0.9rem; padding: 0.85rem; background: var(--bg-alt); border-radius: 6px;">
+                        <div style="margin-bottom: 0.5rem;">
+                            <strong>${escapeHtml(ticket.subject || '')}</strong>
+                            <span class="badge status-${escapeHtml(ticket.status || '')}" style="margin-left: 0.5rem;">${escapeHtml(ticket.status || '')}</span>
+                        </div>
+                        <div style="font-size: 0.9rem; color: var(--text-secondary);">
+                            Category: ${escapeHtml(ticket.category || '')} | Priority: ${escapeHtml(ticket.priority || '')}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    if (riskFlags.length) {
+        html += `
+            <div class="user-detail-section">
+                <h3>Risk Flags (${riskFlags.length})</h3>
+                ${riskFlags.map((flag) => `
+                    <div style="margin-bottom: 0.9rem; padding: 0.85rem; background: var(--bg-alt); border-radius: 6px;">
+                        <div style="margin-bottom: 0.5rem;">
+                            <strong>${escapeHtml(flag.type || '')}</strong>
+                            <span class="badge severity-${escapeHtml(flag.severity || '')}" style="margin-left: 0.5rem;">${escapeHtml(flag.severity || '')}</span>
+                        </div>
+                        <div style="font-size: 0.9rem; color: var(--text-secondary);">${escapeHtml(flag.description || '')}</div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    if (actions.length) {
+        html += `
+            <div class="user-detail-section">
+                <h3>Recovery Actions (${actions.length})</h3>
+                ${actions.map((action) => `
+                    <div style="margin-bottom: 0.9rem; padding: 0.85rem; background: var(--bg-alt); border-radius: 6px;">
+                        <div style="margin-bottom: 0.5rem;">
+                            <strong>${escapeHtml(action.type || '')}</strong>
+                            <span class="badge status-${escapeHtml(action.status || '')}" style="margin-left: 0.5rem;">${escapeHtml(action.status || '')}</span>
+                        </div>
+                        <div style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                            Recovery Value: $${Number(action.recovery_value || 0).toLocaleString()}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    html += `</div>`;
+    return html;
+}
+
+async function toggleInlineUserProfile(userId) {
+    if (inlineExpandedUserId === userId) {
+        inlineExpandedUserId = null;
+        renderUsers();
+        return;
+    }
+
+    inlineExpandedUserId = userId;
+    renderUsers();
+
+    const panel = document.getElementById(`user-profile-inline-${safeDomId(userId)}`);
+    if (panel) panel.innerHTML = `<div class="loading-inline">Loading profile...</div>`;
+
+    if (inlineUserProfileCache[userId]) {
+        if (panel) panel.innerHTML = inlineUserProfileCache[userId];
+        return;
+    }
+
+    try {
+        const response = await apiFetch(`${API_BASE}/users/${userId}`);
+        if (response.error) throw new Error(response.error || 'User not found');
+
+        const html = buildUserProfileInlineHtml(response);
+        inlineUserProfileCache[userId] = html;
+        if (panel) panel.innerHTML = html;
+    } catch (error) {
+        console.error('Error loading inline user profile:', error);
+        if (panel) panel.innerHTML = `<div class="empty-state">Could not load profile.</div>`;
+    }
+}
+
 function renderUsers() {
+    hideTopHeaderWidgets();
     const container = document.getElementById('users-list');
     const paginationMountId = 'users-pagination';
     
@@ -772,6 +1123,7 @@ function renderUsers() {
     container.innerHTML = paged.items.map(userId => {
         const risks = appState.riskFlags.filter(f => f.user_id === userId);
         const actions = appState.actions.filter(a => a.user_id === userId);
+        const expanded = inlineExpandedUserId === userId;
         
         return `
             <div class="list-item">
@@ -783,8 +1135,16 @@ function renderUsers() {
                     <div><strong>Actions:</strong> ${actions.length}</div>
                 </div>
                 <div class="list-item-footer">
-                    <button class="btn-primary" onclick="viewUserDetail('${userId}')">View Details</button>
+                    <button class="${expanded ? 'btn-secondary' : 'btn-primary'}" onclick="toggleInlineUserProfile('${userId}')">
+                        ${expanded ? 'Hide Profile' : 'Open Profile'}
+                    </button>
                 </div>
+
+                <div
+                    id="user-profile-inline-${safeDomId(userId)}"
+                    class="user-profile-inline"
+                    style="display:${expanded ? 'block' : 'none'};"
+                ></div>
             </div>
         `;
     }).join('');
@@ -797,6 +1157,1454 @@ function renderUsers() {
         totalPages: paged.totalPages,
         pageSize: paged.pageSize,
     });
+}
+
+// ===== CLIENT PORTFOLIO (demo-only UI) =====
+const CLIENT_TRACKED_COINS_KEY = 'rud_client_tracked_coins';
+// Always-tracked platform coin (must exist in CLIENT_COIN_LIBRARY + CLIENT_DEMO_HOLDINGS)
+const PORTFOLIO_PLATFORM_COIN = 'RGCIS';
+
+function getTrackedCoins() {
+    try {
+        const raw = localStorage.getItem(CLIENT_TRACKED_COINS_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
+        if (!Array.isArray(parsed)) throw new Error('bad');
+        const known = new Set(getKnownClientCoinSymbols());
+        const clean = parsed
+            .map((c) => String(c))
+            .filter(Boolean)
+            .filter((sym) => known.has(sym));
+        if (!clean.includes(PORTFOLIO_PLATFORM_COIN)) clean.unshift(PORTFOLIO_PLATFORM_COIN);
+        return Array.from(new Set(clean));
+    } catch (e) {
+        return [PORTFOLIO_PLATFORM_COIN, 'BTC', 'ETH', 'USDC'];
+    }
+}
+
+function setTrackedCoins(coins) {
+    const known = new Set(getKnownClientCoinSymbols());
+    const withPlatform = Array.from(
+        new Set([PORTFOLIO_PLATFORM_COIN, ...(coins || [])].map((c) => String(c)).filter((sym) => known.has(sym)))
+    );
+    localStorage.setItem(CLIENT_TRACKED_COINS_KEY, JSON.stringify(withPlatform));
+}
+
+const CLIENT_COIN_LIBRARY = [
+    { symbol: 'RGCIS', name: 'RGCIS Recovery Coin', color: '#14f195' },
+    { symbol: 'BTC', name: 'Bitcoin', color: '#fbbf24' },
+    { symbol: 'ETH', name: 'Ethereum', color: '#8be8f6' },
+    { symbol: 'SOL', name: 'Solana', color: '#34d399' },
+    { symbol: 'USDC', name: 'USD Coin', color: '#60a5fa' },
+    { symbol: 'LINK', name: 'Chainlink', color: '#a78bfa' },
+];
+
+function getKnownClientCoinSymbols() {
+    return CLIENT_COIN_LIBRARY.map((c) => c.symbol);
+}
+
+const CLIENT_DEMO_HOLDINGS = [
+    { symbol: 'RGCIS', qty: 1200, avgPrice: 1.20, currentPrice: 1.65, change24h: 4.3 },
+    { symbol: 'BTC', qty: 0.42, avgPrice: 56000, currentPrice: 64500, change24h: -0.7 },
+    { symbol: 'ETH', qty: 18.7, avgPrice: 2800, currentPrice: 3230, change24h: 1.9 },
+    { symbol: 'USDC', qty: 25000, avgPrice: 1.0, currentPrice: 1.0, change24h: 0.0 },
+    { symbol: 'SOL', qty: 640, avgPrice: 120, currentPrice: 135, change24h: 3.1 },
+    { symbol: 'LINK', qty: 2200, avgPrice: 12.4, currentPrice: 15.1, change24h: -1.4 },
+];
+
+const CLIENT_PORTFOLIO_HOLDINGS_KEY = 'rud_client_portfolio_holdings';
+const CLIENT_BOTS_KEY = 'rud_client_bots';
+const CLIENT_BOT_EVENTS_KEY = 'rud_client_bot_events';
+const CLIENT_BOT_FORM_ASSETS_KEY = 'rud_client_bot_form_assets';
+
+let clientBotIntervals = {}; // botId -> intervalId
+let clientBotExpandedPanels = {}; // botId -> boolean
+let clientBotsRestored = false;
+let clientBotUiBound = false;
+let clientBotEditingId = null;
+
+// ===== Connectors (Demo-only UI) =====
+const CLIENT_CONNECTOR_STATE_KEY = 'rud_client_connectors';
+const CLIENT_CONNECTOR_SYNC_LOG_KEY = 'rud_client_connector_sync_log';
+const CLIENT_CONNECTORS = [
+    {
+        id: 'coinbase',
+        name: 'Coinbase',
+        description: 'Connect exchange account (demo only).',
+        placeholder: 'Paste API key (demo)'
+    },
+    {
+        id: 'yahoo',
+        name: 'Yahoo Finance',
+        description: 'Pull market price snapshots (demo only).',
+        placeholder: 'Paste API key (demo)'
+    },
+    {
+        id: 'etherscan',
+        name: 'Etherscan / Block Explorer',
+        description: 'Enrich wallet activity (demo only).',
+        placeholder: 'Paste API key (demo)'
+    },
+];
+
+function getConnectorSyncLog() {
+    try {
+        const raw = localStorage.getItem(CLIENT_CONNECTOR_SYNC_LOG_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
+        if (Array.isArray(parsed)) return parsed;
+    } catch (e) {
+        // ignore
+    }
+    const empty = [];
+    localStorage.setItem(CLIENT_CONNECTOR_SYNC_LOG_KEY, JSON.stringify(empty));
+    return empty;
+}
+
+function setConnectorSyncLog(log) {
+    localStorage.setItem(CLIENT_CONNECTOR_SYNC_LOG_KEY, JSON.stringify(log || []));
+}
+
+function appendConnectorSyncLogItem(item) {
+    const log = getConnectorSyncLog();
+    log.push(item);
+    const trimmed = log.slice(Math.max(0, log.length - 40));
+    setConnectorSyncLog(trimmed);
+}
+
+function clearConnectorSyncLog() {
+    setConnectorSyncLog([]);
+    renderConnectorSyncLog();
+}
+
+function renderConnectorSyncLog() {
+    const mount = document.getElementById('connector-sync-log');
+    const subtitle = document.getElementById('connector-sync-subtitle');
+    if (!mount) return;
+
+    const log = getConnectorSyncLog().slice().reverse();
+    if (!log.length) {
+        mount.innerHTML = `
+            <div class="connector-sync-item">
+                <div class="connector-sync-item-body">No sync runs yet. Click “Sync all (demo)” or run sync on a connector.</div>
+            </div>
+        `;
+        if (subtitle) subtitle.textContent = 'Connect a provider, then run a demo sync.';
+        return;
+    }
+
+    if (subtitle) {
+        const last = log[0]?.time ? new Date(log[0].time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+        subtitle.textContent = last ? `Last sync run: ${last}` : 'Sync runs are recorded below.';
+    }
+
+    mount.innerHTML = log.map((item) => {
+        const t = item.time ? new Date(item.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+        return `
+            <div class="connector-sync-item">
+                <div class="connector-sync-item-top">
+                    <div class="connector-sync-item-title">${escapeHtml(item.title || 'Sync run')}</div>
+                    <div class="connector-sync-item-meta">${escapeHtml(t)}</div>
+                </div>
+                <div class="connector-sync-item-body">${escapeHtml(item.body || '')}</div>
+            </div>
+        `;
+    }).join('');
+}
+
+function applyDemoPriceRefreshFromConnector(intensity = 'medium') {
+    // Make Yahoo sync feel tangible by refreshing prices + 24h changes.
+    const holdings = getClientPortfolioHoldings();
+    const symbols = holdings.map((h) => h.symbol);
+    simulateMarketPrices(holdings, symbols, intensity);
+    setClientPortfolioHoldings(holdings);
+}
+
+function runConnectorSync(connectorId) {
+    const connector = CLIENT_CONNECTORS.find((c) => c.id === connectorId);
+    if (!connector) return;
+
+    const state = getClientConnectorState();
+    const s = state[connectorId] || { connected: false };
+    if (!s.connected) {
+        alert(`Please connect ${connector.name} first (demo).`);
+        return;
+    }
+
+    // Mock results for storytelling.
+    const now = new Date().toISOString();
+    const results = (() => {
+        if (connectorId === 'yahoo') {
+            applyDemoPriceRefreshFromConnector('medium');
+            return {
+                title: `Synced ${connector.name}`,
+                body: `Fetched ${60 + Math.floor(Math.random() * 80)} market price snapshots. Updated portfolio pricing + 24h change view (demo).`
+            };
+        }
+        if (connectorId === 'coinbase') {
+            return {
+                title: `Synced ${connector.name}`,
+                body: `Imported ${1 + Math.floor(Math.random() * 3)} exchange account(s), ${2 + Math.floor(Math.random() * 5)} wallet(s), and ${120 + Math.floor(Math.random() * 280)} transactions (demo).`
+            };
+        }
+        if (connectorId === 'etherscan') {
+            return {
+                title: `Synced ${connector.name}`,
+                body: `Enriched ${20 + Math.floor(Math.random() * 80)} on-chain events and flagged ${1 + Math.floor(Math.random() * 5)} anomalies for review (demo).`
+            };
+        }
+        return {
+            title: `Synced ${connector.name}`,
+            body: `Sync completed successfully (demo).`
+        };
+    })();
+
+    state[connectorId] = { ...s, lastSyncAt: now };
+    setClientConnectorState(state);
+
+    appendConnectorSyncLogItem({ time: now, title: results.title, body: results.body, connectorId });
+    renderConnectorSyncLog();
+    renderConnectorsDemo();
+    // If we updated prices, refresh portfolio view when user returns.
+    renderPortfolio();
+}
+
+function runAllConnectorSync() {
+    const state = getClientConnectorState();
+    const connected = CLIENT_CONNECTORS.filter((c) => state[c.id]?.connected);
+    if (!connected.length) {
+        alert('Connect at least one provider first (demo).');
+        return;
+    }
+    connected.forEach((c) => runConnectorSync(c.id));
+}
+
+function getClientConnectorState() {
+    try {
+        const raw = localStorage.getItem(CLIENT_CONNECTOR_STATE_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
+        if (parsed && typeof parsed === 'object') return parsed;
+    } catch (e) {
+        // ignore
+    }
+    const empty = {};
+    localStorage.setItem(CLIENT_CONNECTOR_STATE_KEY, JSON.stringify(empty));
+    return empty;
+}
+
+function setClientConnectorState(state) {
+    localStorage.setItem(CLIENT_CONNECTOR_STATE_KEY, JSON.stringify(state || {}));
+}
+
+function toggleClientDemoConnector(connectorId) {
+    const connector = CLIENT_CONNECTORS.find((c) => c.id === connectorId);
+    if (!connector) return;
+
+    const state = getClientConnectorState();
+    const current = state[connectorId] || { connected: false };
+
+    if (current.connected) {
+        state[connectorId] = { ...current, connected: false };
+        setClientConnectorState(state);
+        renderConnectorSyncLog();
+        renderConnectorsDemo();
+        return;
+    }
+
+    const input = document.getElementById(`connector-input-${connectorId}`);
+    const apiKey = input?.value ? String(input.value).trim() : '';
+    if (!apiKey) {
+        alert(`Please enter an API key for ${connector.name} (demo).`);
+        return;
+    }
+
+    state[connectorId] = {
+        connected: true,
+        apiKey,
+        connectedAt: new Date().toISOString(),
+        lastSyncAt: null
+    };
+    setClientConnectorState(state);
+    renderConnectorSyncLog();
+    renderConnectorsDemo();
+}
+
+function renderConnectorsDemo() {
+    const mount = document.getElementById('portfolio-connectors-list');
+    if (!mount) return;
+
+    const state = getClientConnectorState();
+    mount.innerHTML = CLIENT_CONNECTORS.map((c) => {
+        const s = state[c.id] || { connected: false, apiKey: '' };
+        const connected = !!s.connected;
+        const statusText = connected ? 'Connected (demo)' : 'Not connected';
+        const statusClass = connected ? 'connector-status-pill--connected' : '';
+        const btnText = connected ? 'Disconnect' : 'Connect';
+        const btnClass = connected ? 'btn-secondary' : 'btn-primary';
+        const connectedAt = s.connectedAt ? new Date(s.connectedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+        const lastSyncAt = s.lastSyncAt ? new Date(s.lastSyncAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+
+        return `
+            <div class="connector-card">
+                <div class="connector-row">
+                    <div style="min-width: 220px;">
+                        <h4 style="margin:0 0 0.35rem 0;">${escapeHtml(c.name)}</h4>
+                        <div style="color: var(--text-muted); font-size: 0.9rem; line-height: 1.3;">${escapeHtml(c.description)}</div>
+                    </div>
+                    <div>
+                        <div class="connector-status-pill ${statusClass}">
+                            ${escapeHtml(statusText)}${connectedAt ? ` · ${escapeHtml(connectedAt)}` : ''}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="connector-row" style="margin-top: 0.75rem;">
+                    <div class="connector-input">
+                        <input
+                            id="connector-input-${c.id}"
+                            type="password"
+                            placeholder="${escapeHtml(c.placeholder)}"
+                            value="${escapeHtml(s.apiKey || '')}"
+                            ${connected ? 'disabled' : ''}
+                        />
+                    </div>
+                    <div class="connector-btn-row">
+                        <button type="button" class="${btnClass}" onclick="toggleClientDemoConnector('${c.id}')">${btnText}</button>
+                        <button type="button" class="btn-secondary" onclick="runConnectorSync('${c.id}')" ${connected ? '' : 'disabled'}>Sync now</button>
+                    </div>
+                </div>
+
+                <div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.6rem;">
+                    Demo note: connector wiring is UI only; data is still simulated.${lastSyncAt ? ` Last sync: ${escapeHtml(lastSyncAt)}` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function getClientPortfolioHoldings() {
+    try {
+        const raw = localStorage.getItem(CLIENT_PORTFOLIO_HOLDINGS_KEY);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+                const known = new Set(getKnownClientCoinSymbols());
+                const normalized = parsed
+                    .filter((h) => h && known.has(h.symbol))
+                    .map((h) => {
+                        const priceNow = Number(h.currentPrice || 0);
+                        if (h.price24hAgo === undefined || h.price24hAgo === null) {
+                            const change = Number(h.change24h || 0);
+                            const denom = 1 + (change / 100);
+                            const base = denom !== 0 ? priceNow / denom : priceNow;
+                            return { ...h, price24hAgo: base };
+                        }
+                        return h;
+                    });
+                // Persist normalized fields so future reads are consistent.
+                setClientPortfolioHoldings(normalized);
+                return normalized;
+            }
+        }
+    } catch (e) {
+        // ignore
+    }
+    const known = new Set(getKnownClientCoinSymbols());
+    const seeded = CLIENT_DEMO_HOLDINGS.filter((h) => known.has(h.symbol)).map((h) => {
+        const priceNow = Number(h.currentPrice || 0);
+        const change = Number(h.change24h || 0);
+        const denom = 1 + (change / 100);
+        const base = denom !== 0 ? priceNow / denom : priceNow;
+        return { ...h, price24hAgo: base };
+    });
+    localStorage.setItem(CLIENT_PORTFOLIO_HOLDINGS_KEY, JSON.stringify(seeded));
+    return seeded;
+}
+
+function setClientPortfolioHoldings(holdings) {
+    localStorage.setItem(CLIENT_PORTFOLIO_HOLDINGS_KEY, JSON.stringify(holdings || []));
+}
+
+function getClientBotState() {
+    try {
+        const raw = localStorage.getItem(CLIENT_BOTS_KEY);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) return normalizeBots(parsed);
+        }
+    } catch (e) {
+        // ignore
+    }
+    const empty = [];
+    localStorage.setItem(CLIENT_BOTS_KEY, JSON.stringify(empty));
+    return empty;
+}
+
+function setClientBotState(bots) {
+    localStorage.setItem(CLIENT_BOTS_KEY, JSON.stringify(bots || []));
+}
+
+function normalizeBots(bots) {
+    const cleaned = (bots || []).filter(Boolean).map((b) => {
+        const id = b.id || generateId('bot');
+        const createdAt = b.createdAt || new Date().toISOString();
+        const status = b.status || b.state || 'draft';
+        const state = ['draft', 'running', 'paused', 'stopped'].includes(status) ? status : 'stopped';
+
+        return {
+            id,
+            name: String(b.name || 'Bot'),
+            assets: Array.isArray(b.assets) ? b.assets : [],
+            mode: b.mode || 'both',
+            strategy: b.strategy || 'both',
+            intensity: b.intensity || 'medium',
+            tradeSizeMode: b.tradeSizeMode || 'fixed_usd',
+            tradeSizeValue: Number(b.tradeSizeValue || 500),
+            intervalMs: Number(b.intervalMs || (b.intensity === 'high' ? 5000 : b.intensity === 'low' ? 30000 : 10000)),
+            minUsdc: Number(b.minUsdc ?? 250),
+            maxExposurePct: Number(b.maxExposurePct ?? 45),
+            state,
+            createdAt,
+            lastEventAt: b.lastEventAt || null,
+            stats: b.stats && typeof b.stats === 'object'
+                ? b.stats
+                : { trades: 0, realizedPnlUsd: 0, wins: 0, losses: 0 },
+            positions: b.positions && typeof b.positions === 'object' ? b.positions : {}, // symbol -> { qty, avgCost }
+        };
+    });
+
+    // Persist normalized state so it stays consistent.
+    setClientBotState(cleaned);
+    return cleaned;
+}
+
+function getClientBotEvents() {
+    try {
+        const raw = localStorage.getItem(CLIENT_BOT_EVENTS_KEY);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) return parsed;
+        }
+    } catch (e) {
+        // ignore
+    }
+    const empty = [];
+    localStorage.setItem(CLIENT_BOT_EVENTS_KEY, JSON.stringify(empty));
+    return empty;
+}
+
+function setClientBotEvents(events) {
+    localStorage.setItem(CLIENT_BOT_EVENTS_KEY, JSON.stringify(events || []));
+}
+
+function generateId(prefix) {
+    return `${prefix}_${Date.now()}_${String(Math.random()).slice(2, 8)}`;
+}
+
+function formatUSD(n) {
+    const num = Number(n || 0);
+    return `$${num.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+}
+
+function formatSignedUSD(n) {
+    const num = Number(n || 0);
+    const abs = Math.abs(num);
+    const sign = num < 0 ? '-' : '';
+    return `${sign}$${abs.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+}
+
+function renderPortfolio() {
+    const holdingsTbody = document.getElementById('portfolio-holdings-tbody');
+    const trackList = document.getElementById('portfolio-track-list');
+    const summaryEl = document.getElementById('portfolio-summary');
+    const tipsEl = document.getElementById('portfolio-track-tips');
+
+    if (!holdingsTbody || !trackList || !summaryEl) return;
+
+    const trackedCoins = getTrackedCoins();
+    const trackedSet = new Set(trackedCoins);
+
+    const holdingsState = getClientPortfolioHoldings();
+    const holdings = holdingsState.map((h) => {
+        const value = h.qty * h.currentPrice;
+        const tracked = trackedSet.has(h.symbol);
+        return { ...h, value, tracked };
+    }).sort((a, b) => b.value - a.value);
+
+    const totalValue = holdings.reduce((s, h) => s + h.value, 0);
+    const trackedValue = holdings.filter((h) => h.tracked).reduce((s, h) => s + h.value, 0);
+    const trackedCount = trackedCoins.length;
+
+    summaryEl.innerHTML = `
+        <div class="portfolio-summary-grid">
+            <div class="portfolio-summary-item">
+                <div class="portfolio-summary-label">Total Portfolio Value</div>
+                <div class="portfolio-summary-value">${formatUSD(totalValue)}</div>
+            </div>
+            <div class="portfolio-summary-item">
+                <div class="portfolio-summary-label">Tracked Value</div>
+                <div class="portfolio-summary-value">${formatUSD(trackedValue)}</div>
+            </div>
+            <div class="portfolio-summary-item">
+                <div class="portfolio-summary-label">Coins Tracked</div>
+                <div class="portfolio-summary-value">${trackedCount}</div>
+            </div>
+        </div>
+    `;
+
+    holdingsTbody.innerHTML = holdings.map((h) => {
+        const coin = CLIENT_COIN_LIBRARY.find((c) => c.symbol === h.symbol);
+        const badge = h.tracked
+            ? `<span class="coin-pill coin-pill--tracked" style="border-color:${coin?.color || '#14f195'};">Tracked</span>`
+            : `<span class="coin-pill coin-pill--nottracked">Watch</span>`;
+        const changeClass = h.change24h > 0 ? 'pos' : h.change24h < 0 ? 'neg' : 'flat';
+        const changeText = `${h.change24h > 0 ? '+' : ''}${h.change24h.toFixed(2)}%`;
+        return `
+            <tr>
+                <td>
+                    <div class="portfolio-coin-cell">
+                        <span class="coin-dot" style="background:${coin?.color || '#8be8f6'}"></span>
+                        <span class="portfolio-coin-symbol">${h.symbol}</span>
+                        ${badge}
+                    </div>
+                </td>
+                <td>${typeof h.qty === 'number' ? h.qty.toLocaleString(undefined, { maximumFractionDigits: 6 }) : h.qty}</td>
+                <td>${formatUSD(h.currentPrice)}</td>
+                <td><strong>${formatUSD(h.value)}</strong></td>
+                <td class="portfolio-change ${changeClass}">${changeText}</td>
+            </tr>
+        `;
+    }).join('');
+
+    if (tipsEl) {
+        tipsEl.innerHTML = `<p class="portfolio-note">Platform coin <strong>${PORTFOLIO_PLATFORM_COIN}</strong> is always tracked. Toggle others to change what you highlight in the dashboard.</p>`;
+    }
+
+    trackList.innerHTML = CLIENT_COIN_LIBRARY.map((coin) => {
+        const isPlatform = coin.symbol === PORTFOLIO_PLATFORM_COIN;
+        const checked = trackedSet.has(coin.symbol);
+        return `
+            <label class="portfolio-coin-track">
+                <input
+                    type="checkbox"
+                    ${checked ? 'checked' : ''}
+                    ${isPlatform ? 'disabled' : ''}
+                    onchange="onPortfolioTrackToggle('${coin.symbol}', this.checked)"
+                />
+                <span class="portfolio-coin-track-label">
+                    <span class="coin-dot" style="background:${coin.color};"></span>
+                    ${coin.symbol} <span class="portfolio-coin-track-name">(${coin.name})</span>
+                </span>
+            </label>
+        `;
+    }).join('');
+
+    // Keep bot form in sync with tracked coins.
+    renderBotAssetsSelector(trackedCoins);
+    renderBotsUI();
+    renderBotActivityUI();
+    restoreRunningBotsFromStorage();
+    renderConnectorsDemo();
+
+    if (!clientBotUiBound) {
+        clientBotUiBound = true;
+        document.getElementById('bot-create-btn')?.addEventListener('click', () => createClientBotFromForm());
+        document.getElementById('bot-simulate-one-btn')?.addEventListener('click', () => simulateBotOneCyclePreview());
+        document.getElementById('bot-cancel-edit-btn')?.addEventListener('click', () => cancelBotEdit());
+    }
+}
+
+function onPortfolioTrackToggle(symbol, checked) {
+    const tracked = getTrackedCoins();
+    const set = new Set(tracked);
+    if (symbol === PORTFOLIO_PLATFORM_COIN) return; // always tracked
+    if (checked) set.add(symbol);
+    else set.delete(symbol);
+    setTrackedCoins(Array.from(set));
+    renderPortfolio();
+}
+
+function getBotFormAssetsSelection() {
+    const raw = localStorage.getItem(CLIENT_BOT_FORM_ASSETS_KEY);
+    if (!raw) return [];
+    try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed.map((x) => String(x)).filter(Boolean);
+    } catch (e) {
+        // ignore
+    }
+    return [];
+}
+
+function setBotFormAssetsSelection(coins) {
+    localStorage.setItem(CLIENT_BOT_FORM_ASSETS_KEY, JSON.stringify(coins || []));
+}
+
+function onBotAssetToggle(symbol, checked) {
+    const selected = new Set(getBotFormAssetsSelection());
+    if (checked) selected.add(String(symbol));
+    else selected.delete(String(symbol));
+    setBotFormAssetsSelection(Array.from(selected));
+}
+
+function renderBotAssetsSelector(trackedCoins) {
+    const container = document.getElementById('bot-assets-select');
+    if (!container) return;
+
+    const coins = Array.from(new Set((trackedCoins || []).map((c) => String(c)).filter(Boolean)));
+    const stored = new Set(getBotFormAssetsSelection());
+    // Default: select all tracked coins when nothing stored yet.
+    if (stored.size === 0) coins.forEach((c) => stored.add(c));
+
+    container.innerHTML = coins
+        .sort((a, b) => (a === PORTFOLIO_PLATFORM_COIN ? -1 : 1) - (b === PORTFOLIO_PLATFORM_COIN ? -1 : 1))
+        .map((symbol) => {
+            const coin = CLIENT_COIN_LIBRARY.find((c) => c.symbol === symbol);
+            const checked = stored.has(symbol);
+            return `
+                <label class="portfolio-coin-track">
+                    <input
+                        type="checkbox"
+                        ${checked ? 'checked' : ''}
+                        onchange="onBotAssetToggle('${symbol}', this.checked)"
+                    />
+                    <span class="portfolio-coin-track-label">
+                        <span class="coin-dot" style="background:${coin?.color || '#8be8f6'}"></span>
+                        ${symbol} <span class="portfolio-coin-track-name">(${coin?.name || 'Asset'})</span>
+                    </span>
+                </label>
+            `;
+        })
+        .join('');
+
+    setBotFormAssetsSelection(coins.filter((c) => stored.has(c)));
+}
+
+function getClientHoldingsBySymbol(holdings, symbol) {
+    return holdings.find((h) => h.symbol === symbol);
+}
+
+function intensityToIntervalMs(intensity) {
+    if (intensity === 'low') return 5000;
+    if (intensity === 'high') return 1500;
+    return 2500; // medium
+}
+
+function intensityToUsd(intensity) {
+    if (intensity === 'low') return 250;
+    if (intensity === 'high') return 1000;
+    return 500; // medium
+}
+
+function intensityToVolMultiplier(intensity) {
+    if (intensity === 'low') return 0.75;
+    if (intensity === 'high') return 1.45;
+    return 1; // medium
+}
+
+const PRICE_VOL_BY_SYMBOL = {
+    // Volatility per bot tick (demo-only; not real time units).
+    RGCIS: 0.025,
+    BTC: 0.0045,
+    ETH: 0.008,
+    SOL: 0.018,
+    USDC: 0.00025,
+    LINK: 0.014
+};
+
+function clampPrice(n, min, max) {
+    return Math.min(max, Math.max(min, n));
+}
+
+function randn() {
+    // Box–Muller transform (approx normal distribution).
+    let u = 0;
+    let v = 0;
+    while (u === 0) u = Math.random();
+    while (v === 0) v = Math.random();
+    return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+}
+
+function simulateMarketPrices(holdings, symbolsToUpdate, intensity) {
+    const set = new Set(symbolsToUpdate || []);
+    const volMult = intensityToVolMultiplier(intensity);
+
+    holdings.forEach((h) => {
+        if (!set.has(h.symbol)) return;
+
+        const priceNow = Number(h.currentPrice || 0);
+        if (!priceNow || priceNow <= 0) return;
+
+        // Baseline price used to recompute "24h change".
+        if (h.price24hAgo === undefined || h.price24hAgo === null) {
+            h.price24hAgo = priceNow;
+        }
+
+        const baseVol = PRICE_VOL_BY_SYMBOL[h.symbol] ?? 0.01;
+        const vol = baseVol * volMult;
+
+        // Small drift + random shock.
+        const drift = (Math.random() - 0.5) * vol * 0.35;
+        const shock = randn() * vol * 0.75;
+        let newPrice = priceNow * (1 + drift + shock);
+
+        if (h.symbol === 'USDC') {
+            newPrice = clampPrice(newPrice, 0.993, 1.007);
+        } else {
+            newPrice = Math.max(newPrice, priceNow * 0.7); // avoid extreme drops in demo
+            newPrice = Math.min(newPrice, priceNow * 1.45); // avoid extreme pumps in demo
+        }
+
+        h.currentPrice = newPrice;
+        const baseline = Number(h.price24hAgo || priceNow);
+        const changePct = baseline ? ((newPrice / baseline) - 1) * 100 : 0;
+        h.change24h = Number.isFinite(changePct) ? changePct : 0;
+    });
+
+    return holdings;
+}
+
+function chooseAction(bot, holding) {
+    const mode = bot.mode;
+    if (mode === 'buy') return 'buy';
+    if (mode === 'sell') return 'sell';
+
+    // DCA: consistent buy-side accumulation (demo expectation).
+    if (bot.strategy === 'dca') return 'buy';
+
+    // "Both" strategy means Threshold or DCA (demo-only).
+    const effectiveStrategy = bot.strategy === 'both'
+        ? (Math.random() < 0.5 ? 'threshold' : 'dca')
+        : bot.strategy;
+
+    if (effectiveStrategy === 'threshold') {
+        // Threshold-like behavior: follow the demo 24h direction.
+        return (holding?.change24h || 0) >= 0 ? 'buy' : 'sell';
+    }
+
+    if (effectiveStrategy === 'dca') {
+        return 'buy';
+    }
+
+    // Optional momentum strategy (kept for demo flexibility).
+    if (effectiveStrategy === 'momentum') {
+        return (holding?.change24h || 0) >= 0 ? 'buy' : 'sell';
+    }
+
+    return Math.random() < 0.5 ? 'buy' : 'sell';
+}
+
+function buildReason(bot, action, symbol, holding) {
+    const ch = Number(holding?.change24h || 0);
+    const chText = `${ch >= 0 ? '+' : ''}${ch.toFixed(2)}%`;
+    const strategy = bot.strategy || 'both';
+    if (strategy === 'threshold') {
+        return `${action.toUpperCase()} ${symbol} — Threshold (${chText})`;
+    }
+    if (strategy === 'dca') {
+        return `${action.toUpperCase()} ${symbol} — DCA scheduled buy`;
+    }
+    if (strategy === 'momentum') {
+        return `${action.toUpperCase()} ${symbol} — Momentum bias (${chText})`;
+    }
+    return `${action.toUpperCase()} ${symbol} — Mixed strategy (${chText})`;
+}
+
+function appendClientBotEvent(event) {
+    const events = getClientBotEvents();
+    events.push(event);
+    // Keep last 200 events.
+    const trimmed = events.slice(Math.max(0, events.length - 200));
+    setClientBotEvents(trimmed);
+}
+
+function renderBotsUI() {
+    const mount = document.getElementById('portfolio-bots-list');
+    if (!mount) return;
+    const bots = getClientBotState();
+
+    if (bots.length === 0) {
+        mount.innerHTML = `
+            <div class="empty-state" style="padding: 1rem;">
+                <div class="empty-state-icon">🤖</div>
+                No bots created yet.
+            </div>
+        `;
+        return;
+    }
+
+    mount.innerHTML = bots
+        .slice()
+        .sort((a, b) => (b.lastEventAt || b.createdAt).localeCompare(a.lastEventAt || a.createdAt))
+        .map((bot) => {
+            const expanded = !!clientBotExpandedPanels[bot.id];
+            const assetsCount = Array.isArray(bot.assets) ? bot.assets.length : 0;
+            const state = bot.state || bot.status || 'stopped';
+            const statusPill = state === 'running'
+                ? '<span class="portfolio-bot-pill portfolio-bot-pill--running">Running</span>'
+                : state === 'paused'
+                    ? '<span class="portfolio-bot-pill portfolio-bot-pill--stopped">Paused</span>'
+                    : state === 'draft'
+                        ? '<span class="portfolio-bot-pill portfolio-bot-pill--stopped">Draft</span>'
+                        : '<span class="portfolio-bot-pill portfolio-bot-pill--stopped">Stopped</span>';
+            const modeLabel = bot.mode === 'both' ? 'Buy/Sell' : bot.mode.charAt(0).toUpperCase() + bot.mode.slice(1);
+            const strategyLabel = bot.strategy === 'both'
+                ? 'Both (Threshold / DCA)'
+                : bot.strategy === 'dca'
+                    ? 'DCA'
+                    : bot.strategy === 'threshold'
+                        ? 'Threshold'
+                        : bot.strategy.charAt(0).toUpperCase() + bot.strategy.slice(1);
+            const intensityLabel = bot.intensity ? bot.intensity.charAt(0).toUpperCase() + bot.intensity.slice(1) : 'Medium';
+            const last = bot.lastEventAt ? new Date(bot.lastEventAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+            const trades = Number(bot.stats?.trades || 0);
+            const pnl = Number(bot.stats?.realizedPnlUsd || 0);
+            return `
+                <div class="portfolio-bot-card">
+                    <h5>${escapeHtml(bot.name || 'Bot')} ${statusPill}</h5>
+                    <div class="portfolio-bot-meta">
+                        Mode: <strong>${escapeHtml(modeLabel)}</strong> · Strategy: <strong>${escapeHtml(strategyLabel)}</strong> · Intensity: <strong>${escapeHtml(intensityLabel)}</strong>
+                        <div style="margin-top: 0.35rem; color: var(--text-secondary);">
+                            Assets: <strong>${assetsCount}</strong> · Trades: <strong>${trades}</strong> · Realized P/L: <strong>${formatSignedUSD(pnl)}</strong> · Last: <strong>${escapeHtml(String(last))}</strong>
+                        </div>
+                    </div>
+                    <div class="portfolio-bot-actions">
+                        ${
+                            state === 'running'
+                                ? `<button type="button" class="btn-secondary" onclick="pauseClientBot('${bot.id}')">Pause</button>
+                                   <button type="button" class="btn-secondary" onclick="stopClientBot('${bot.id}')">Stop</button>`
+                                : `<button type="button" class="btn-primary" onclick="startClientBot('${bot.id}')">Start</button>`
+                        }
+                        <button type="button" class="btn-secondary" onclick="toggleClientBotActivityPanel('${bot.id}')">
+                            ${expanded ? 'Hide' : 'Open'} Activity
+                        </button>
+                        <button type="button" class="btn-secondary" onclick="beginEditClientBot('${bot.id}')">Edit</button>
+                        <button type="button" class="btn-secondary" onclick="cloneClientBot('${bot.id}')">Clone</button>
+                        <button type="button" class="btn-danger" onclick="deleteClientBot('${bot.id}')">Delete</button>
+                    </div>
+
+                    <div class="portfolio-bot-panel-activity" id="portfolio-bot-activity-panel-${bot.id}" style="display:${expanded ? 'block' : 'none'};">
+                        ${expanded ? renderClientBotActivityItems(getClientBotEventsForBot(bot.id)) : ''}
+                    </div>
+                </div>
+            `;
+        })
+        .join('');
+}
+
+function renderBotActivityUI() {
+    const mount = document.getElementById('portfolio-bot-activity');
+    if (!mount) return;
+    const events = getClientBotEvents();
+    if (!events.length) {
+        mount.innerHTML = `
+            <div class="portfolio-bot-activity-item">
+                No bot activity yet. Start a bot or click “Simulate One Cycle”.
+            </div>
+        `;
+        return;
+    }
+
+    const recent = events.slice().reverse().slice(0, 12);
+    mount.innerHTML = recent.map((e) => {
+        const sign = e.qtyDelta > 0 ? '+' : '';
+        const type = e.type ? String(e.type).toUpperCase() : 'TRADE';
+        return `
+            <div class="portfolio-bot-activity-item">
+                <div class="portfolio-bot-activity-top">
+                    <div><span class="portfolio-bot-activity-type">${escapeHtml(type)}</span> · <strong>${escapeHtml(e.symbol)}</strong></div>
+                    <div style="color: var(--text-secondary); font-size: 0.85rem;">${escapeHtml(
+                        new Date(e.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    )}</div>
+                </div>
+                <div style="color: var(--text-secondary); font-size: 0.85rem; line-height: 1.4;">
+                    Bot: <strong>${escapeHtml(e.botName)}</strong><br/>
+                    Qty Δ: <strong>${sign}${Number(e.qtyDelta).toLocaleString(undefined, { maximumFractionDigits: 6 })}</strong> @ ${formatUSD(e.price)}<br/>
+                    USD impact: <strong>${formatSignedUSD(e.usdValue)}</strong><br/>
+                    ${e.reason ? `Reason: ${escapeHtml(e.reason)}` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function getClientBotEventsForBot(botId, limit = 8) {
+    const events = getClientBotEvents().filter((e) => e.botId === botId);
+    // Show newest first.
+    return events.slice().reverse().slice(0, limit);
+}
+
+function renderClientBotActivityItems(events) {
+    if (!events || events.length === 0) {
+        return `
+            <div class="portfolio-bot-activity-item">
+                No bot activity yet.
+            </div>
+        `;
+    }
+
+    return events.map((e) => {
+        const sign = e.qtyDelta > 0 ? '+' : '';
+        const type = e.type ? String(e.type).toUpperCase() : 'TRADE';
+        return `
+            <div class="portfolio-bot-activity-item">
+                <div class="portfolio-bot-activity-top">
+                    <div><span class="portfolio-bot-activity-type">${escapeHtml(type)}</span> · <strong>${escapeHtml(e.symbol)}</strong></div>
+                    <div style="color: var(--text-secondary); font-size: 0.85rem;">${escapeHtml(
+                        new Date(e.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    )}</div>
+                </div>
+                <div style="color: var(--text-secondary); font-size: 0.85rem; line-height: 1.4;">
+                    Bot: <strong>${escapeHtml(e.botName)}</strong><br/>
+                    Qty Δ: <strong>${sign}${Number(e.qtyDelta).toLocaleString(undefined, { maximumFractionDigits: 6 })}</strong> @ ${formatUSD(e.price)}<br/>
+                    USD impact: <strong>${formatSignedUSD(e.usdValue)}</strong><br/>
+                    ${e.reason ? `Reason: ${escapeHtml(e.reason)}` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function updateClientBotActivityPanel(botId) {
+    const panel = document.getElementById(`portfolio-bot-activity-panel-${botId}`);
+    if (!panel) return;
+    panel.innerHTML = renderClientBotActivityItems(getClientBotEventsForBot(botId));
+}
+
+function toggleClientBotActivityPanel(botId) {
+    clientBotExpandedPanels[botId] = !clientBotExpandedPanels[botId];
+    renderBotsUI(); // re-render for button text + visibility state
+    if (clientBotExpandedPanels[botId]) {
+        updateClientBotActivityPanel(botId);
+    }
+}
+
+function deleteClientBot(botId) {
+    const bots = getClientBotState();
+    const bot = bots.find((b) => b.id === botId);
+    const name = bot?.name || 'bot';
+
+    const ok = confirm(`Delete "${name}"? This will stop the demo bot and remove its activity from the UI.`);
+    if (!ok) return;
+
+    if (clientBotIntervals[botId]) {
+        clearInterval(clientBotIntervals[botId]);
+        delete clientBotIntervals[botId];
+    }
+
+    // Remove bot + its events; keep holdings as-is (demo effect remains).
+    const remainingBots = bots.filter((b) => b.id !== botId);
+    setClientBotState(remainingBots);
+
+    const remainingEvents = getClientBotEvents().filter((e) => e.botId !== botId);
+    setClientBotEvents(remainingEvents);
+
+    delete clientBotExpandedPanels[botId];
+
+    renderBotsUI();
+    renderBotActivityUI();
+    renderPortfolio();
+}
+
+function restoreRunningBotsFromStorage() {
+    if (clientBotsRestored) return;
+    clientBotsRestored = true;
+
+    const bots = getClientBotState();
+    bots.forEach((bot) => {
+        if ((bot.state || bot.status) === 'running') {
+            startClientBot(bot.id, true);
+        }
+    });
+}
+
+function startClientBot(botId, silent = false) {
+    const bots = getClientBotState();
+    const bot = bots.find((b) => b.id === botId);
+    if (!bot) return;
+
+    if (bot.state !== 'running') {
+        bot.state = 'running';
+        setClientBotState(bots);
+    }
+
+    if (!silent) {
+        simulateBotTick(botId);
+        // Make sure the activity pane updates even if portfolio re-render is skipped.
+        renderBotActivityUI();
+    }
+
+    if (clientBotIntervals[botId]) return;
+    const intervalMs = Number(bot.intervalMs || 10000);
+    clientBotIntervals[botId] = setInterval(() => simulateBotTick(botId), intervalMs);
+    renderBotsUI();
+}
+
+function pauseClientBot(botId) {
+    const bots = getClientBotState();
+    const bot = bots.find((b) => b.id === botId);
+    if (!bot) return;
+
+    bot.state = 'paused';
+    setClientBotState(bots);
+
+    if (clientBotIntervals[botId]) {
+        clearInterval(clientBotIntervals[botId]);
+        delete clientBotIntervals[botId];
+    }
+    renderBotsUI();
+}
+
+function stopClientBot(botId) {
+    const bots = getClientBotState();
+    const bot = bots.find((b) => b.id === botId);
+    if (!bot) return;
+
+    bot.state = 'stopped';
+    setClientBotState(bots);
+
+    if (clientBotIntervals[botId]) {
+        clearInterval(clientBotIntervals[botId]);
+        delete clientBotIntervals[botId];
+    }
+    renderBotsUI();
+}
+
+function simulateBotTick(botId) {
+    const bots = getClientBotState();
+    const bot = bots.find((b) => b.id === botId);
+    if (!bot || bot.state !== 'running') return;
+
+    const holdings = getClientPortfolioHoldings();
+    const trackedCoins = getTrackedCoins();
+    const assets = Array.isArray(bot.assets) && bot.assets.length > 0 ? bot.assets : trackedCoins;
+    const holdingsSymbols = new Set(holdings.map((h) => h.symbol));
+    const actionableSymbols = assets.filter((s) => holdingsSymbols.has(s));
+    if (!actionableSymbols.length) return;
+
+    // Update market prices first, so decisions look live.
+    simulateMarketPrices(holdings, actionableSymbols, bot.intensity);
+
+    const symbol = actionableSymbols[Math.floor(Math.random() * actionableSymbols.length)];
+    const holding = getClientHoldingsBySymbol(holdings, symbol);
+    if (!holding) return;
+
+    const action = chooseAction(bot, holding);
+    const currentPrice = Number(holding.currentPrice || 0);
+    if (!currentPrice || currentPrice <= 0) return;
+
+    // Demo fees + slippage for realism.
+    const feePercent = bot.intensity === 'high' ? 0.004 : bot.intensity === 'low' ? 0.0025 : 0.003;
+    const slipPct = bot.intensity === 'high' ? 0.0015 : bot.intensity === 'low' ? 0.0008 : 0.001;
+    const effectivePrice = action === 'buy'
+        ? currentPrice * (1 + slipPct)
+        : currentPrice * (1 - slipPct);
+
+    // Cash is USDC (demo realism).
+    const usdc = getClientHoldingsBySymbol(holdings, 'USDC');
+    const usdcQty = Number(usdc?.qty || 0);
+    const minUsdc = Number(bot.minUsdc ?? 250);
+
+    // Trade sizing.
+    const tradeSizeMode = bot.tradeSizeMode || 'fixed_usd';
+    const tradeSizeValue = Number(bot.tradeSizeValue || 500);
+    const percent = clamp(tradeSizeValue, 1, 100) / 100;
+
+    let usdTarget = 0;
+    if (tradeSizeMode === 'percent') {
+        usdTarget = action === 'buy'
+            ? usdcQty * percent
+            : Number(holding.qty || 0) * effectivePrice * percent;
+    } else {
+        usdTarget = Math.max(1, tradeSizeValue);
+    }
+
+    // Guards (min balance and max exposure).
+    const totalValue = holdings.reduce((s, h) => s + Number(h.qty || 0) * Number(h.currentPrice || 0), 0);
+    const maxExposurePct = clamp(Number(bot.maxExposurePct ?? 45), 5, 100) / 100;
+    const holdingValue = Number(holding.qty || 0) * Number(holding.currentPrice || 0);
+    const maxAllowed = totalValue * maxExposurePct;
+
+    if (action === 'buy') {
+        if (usdcQty < minUsdc) {
+            appendClientBotEvent({
+                id: generateId('evt'),
+                botId,
+                botName: bot.name || 'Bot',
+                time: new Date().toISOString(),
+                type: 'skip',
+                symbol,
+                qtyDelta: 0,
+                price: effectivePrice,
+                usdValue: 0,
+                reason: `SKIP — USDC below minimum (${formatUSD(usdcQty)} < ${formatUSD(minUsdc)})`,
+            });
+            renderBotActivityUI();
+            return;
+        }
+        if (holdingValue >= maxAllowed) {
+            appendClientBotEvent({
+                id: generateId('evt'),
+                botId,
+                botName: bot.name || 'Bot',
+                time: new Date().toISOString(),
+                type: 'skip',
+                symbol,
+                qtyDelta: 0,
+                price: effectivePrice,
+                usdValue: 0,
+                reason: `SKIP — max exposure reached for ${symbol} (${formatUSD(holdingValue)} ≥ ${formatUSD(maxAllowed)})`,
+            });
+            renderBotActivityUI();
+            return;
+        }
+        usdTarget = Math.min(usdTarget, Math.max(0, usdcQty - minUsdc));
+        if (usdTarget <= 1) {
+            appendClientBotEvent({
+                id: generateId('evt'),
+                botId,
+                botName: bot.name || 'Bot',
+                time: new Date().toISOString(),
+                type: 'skip',
+                symbol,
+                qtyDelta: 0,
+                price: effectivePrice,
+                usdValue: 0,
+                reason: `SKIP — not enough free USDC after minimum balance`,
+            });
+            renderBotActivityUI();
+            return;
+        }
+    }
+
+    let qtyDelta = 0;
+    let usdImpactSigned = 0;
+    if (action === 'buy') {
+        const qtyToBuy = usdTarget / effectivePrice;
+        const qtyAfterFee = qtyToBuy * (1 - feePercent);
+        qtyDelta = qtyAfterFee;
+        holding.qty = Number(holding.qty || 0) + qtyDelta;
+        if (usdc) usdc.qty = Math.max(0, usdcQty - usdTarget);
+        usdImpactSigned = usdTarget; // BUY spend (demo)
+
+        // Update bot virtual position cost basis.
+        const pos = bot.positions?.[symbol] || { qty: 0, avgCost: 0 };
+        const prevQty = Number(pos.qty || 0);
+        const newQty = prevQty + qtyDelta;
+        const prevCost = prevQty * Number(pos.avgCost || 0);
+        const addCost = qtyDelta * effectivePrice;
+        bot.positions = bot.positions || {};
+        bot.positions[symbol] = { qty: newQty, avgCost: newQty > 0 ? (prevCost + addCost) / newQty : 0 };
+    } else {
+        const sellable = Number(holding.qty || 0);
+        const qtyDesired = usdTarget / effectivePrice;
+        const sellQty = Math.min(sellable, qtyDesired);
+        if (sellQty <= 0) return;
+        qtyDelta = -sellQty;
+        holding.qty = Math.max(0, sellable - sellQty);
+        const usdReceived = sellQty * effectivePrice * (1 - feePercent);
+        if (usdc) usdc.qty = usdcQty + usdReceived;
+        usdImpactSigned = -usdReceived; // SELL impact
+
+        // Realized P/L for demo analytics using virtual avg cost.
+        const pos = bot.positions?.[symbol] || { qty: 0, avgCost: effectivePrice };
+        const avgCost = Number(pos.avgCost || effectivePrice);
+        const realized = (effectivePrice - avgCost) * sellQty;
+        bot.stats = bot.stats || { trades: 0, realizedPnlUsd: 0, wins: 0, losses: 0 };
+        bot.stats.realizedPnlUsd = Number(bot.stats.realizedPnlUsd || 0) + realized;
+        if (realized >= 0) bot.stats.wins = Number(bot.stats.wins || 0) + 1;
+        else bot.stats.losses = Number(bot.stats.losses || 0) + 1;
+        // Reduce virtual position qty.
+        const remainingQty = Math.max(0, Number(pos.qty || 0) - sellQty);
+        bot.positions = bot.positions || {};
+        bot.positions[symbol] = { qty: remainingQty, avgCost: remainingQty > 0 ? avgCost : 0 };
+    }
+
+    bot.stats = bot.stats || { trades: 0, realizedPnlUsd: 0, wins: 0, losses: 0 };
+    bot.stats.trades = Number(bot.stats.trades || 0) + 1;
+
+    setClientPortfolioHoldings(holdings);
+
+    const event = {
+        id: generateId('evt'),
+        botId,
+        botName: bot.name || 'Bot',
+        time: new Date().toISOString(),
+        type: action,
+        symbol,
+        qtyDelta,
+        price: effectivePrice,
+        usdValue: usdImpactSigned,
+        reason: buildReason(bot, action, symbol, holding),
+    };
+    appendClientBotEvent(event);
+
+    bot.lastEventAt = event.time;
+    setClientBotState(bots);
+
+    if (clientBotExpandedPanels[botId]) {
+        updateClientBotActivityPanel(botId);
+    }
+
+    renderBotActivityUI();
+    renderPortfolio();
+}
+
+function getBotConfigFromForm() {
+    const name = (document.getElementById('bot-name')?.value || 'Your Friend').trim() || 'Your Friend';
+    const mode = document.getElementById('bot-mode')?.value || 'both';
+    const strategy = document.getElementById('bot-strategy')?.value || 'both';
+    const intensity = document.getElementById('bot-intensity')?.value || 'medium';
+    const tradeSizeMode = document.getElementById('bot-trade-size-mode')?.value || 'fixed_usd';
+    const tradeSizeValue = Number(document.getElementById('bot-trade-size')?.value || 500);
+    const intervalMs = Number(document.getElementById('bot-interval')?.value || 10000);
+    const minUsdc = Number(document.getElementById('bot-min-usdc')?.value || 250);
+    const maxExposurePct = Number(document.getElementById('bot-max-exposure')?.value || 45);
+
+    const selectedAssets = getBotFormAssetsSelection();
+    return { name, mode, strategy, intensity, tradeSizeMode, tradeSizeValue, intervalMs, minUsdc, maxExposurePct, assets: selectedAssets };
+}
+
+function createClientBotFromForm() {
+    const cfg = getBotConfigFromForm();
+    if (!cfg.assets || cfg.assets.length === 0) {
+        alert('Please select at least one asset from the tracked list.');
+        return;
+    }
+    const bots = getClientBotState();
+    const now = new Date().toISOString();
+
+    if (clientBotEditingId) {
+        const bot = bots.find((b) => b.id === clientBotEditingId);
+        if (!bot) {
+            clientBotEditingId = null;
+        } else if (bot.state === 'running') {
+            alert('Pause/Stop the bot before editing.');
+            return;
+        } else {
+            Object.assign(bot, {
+                name: cfg.name,
+                assets: cfg.assets,
+                mode: cfg.mode,
+                strategy: cfg.strategy,
+                intensity: cfg.intensity,
+                tradeSizeMode: cfg.tradeSizeMode,
+                tradeSizeValue: cfg.tradeSizeValue,
+                intervalMs: cfg.intervalMs,
+                minUsdc: cfg.minUsdc,
+                maxExposurePct: cfg.maxExposurePct,
+            });
+            setClientBotState(bots);
+            finishBotEditMode();
+            renderBotsUI();
+            renderBotActivityUI();
+            return;
+        }
+    }
+
+    const newBot = {
+        id: generateId('bot'),
+        name: cfg.name,
+        assets: cfg.assets,
+        mode: cfg.mode,
+        strategy: cfg.strategy,
+        intensity: cfg.intensity,
+        tradeSizeMode: cfg.tradeSizeMode,
+        tradeSizeValue: cfg.tradeSizeValue,
+        intervalMs: cfg.intervalMs,
+        minUsdc: cfg.minUsdc,
+        maxExposurePct: cfg.maxExposurePct,
+        state: 'draft',
+        createdAt: now,
+        lastEventAt: null,
+        stats: { trades: 0, realizedPnlUsd: 0, wins: 0, losses: 0 },
+        positions: {},
+    };
+    bots.push(newBot);
+    setClientBotState(bots);
+    renderBotsUI();
+    renderBotActivityUI();
+}
+
+function beginEditClientBot(botId) {
+    const bots = getClientBotState();
+    const bot = bots.find((b) => b.id === botId);
+    if (!bot) return;
+    if (bot.state === 'running') {
+        alert('Pause/Stop the bot before editing.');
+        return;
+    }
+    clientBotEditingId = botId;
+
+    document.getElementById('bot-name').value = bot.name || '';
+    document.getElementById('bot-mode').value = bot.mode || 'both';
+    document.getElementById('bot-strategy').value = bot.strategy || 'both';
+    document.getElementById('bot-intensity').value = bot.intensity || 'medium';
+    document.getElementById('bot-trade-size-mode').value = bot.tradeSizeMode || 'fixed_usd';
+    document.getElementById('bot-trade-size').value = String(Number(bot.tradeSizeValue || 500));
+    document.getElementById('bot-interval').value = String(Number(bot.intervalMs || 10000));
+    document.getElementById('bot-min-usdc').value = String(Number(bot.minUsdc ?? 250));
+    document.getElementById('bot-max-exposure').value = String(Number(bot.maxExposurePct ?? 45));
+
+    // Assets selection
+    setBotFormAssetsSelection(Array.isArray(bot.assets) ? bot.assets : []);
+    renderBotAssetsSelector(getTrackedCoins());
+
+    const createBtn = document.getElementById('bot-create-btn');
+    const cancelBtn = document.getElementById('bot-cancel-edit-btn');
+    if (createBtn) createBtn.textContent = 'Save Bot';
+    if (cancelBtn) cancelBtn.style.display = '';
+}
+
+function finishBotEditMode() {
+    clientBotEditingId = null;
+    const createBtn = document.getElementById('bot-create-btn');
+    const cancelBtn = document.getElementById('bot-cancel-edit-btn');
+    if (createBtn) createBtn.textContent = 'Create Bot';
+    if (cancelBtn) cancelBtn.style.display = 'none';
+}
+
+function cancelBotEdit() {
+    finishBotEditMode();
+    // Keep assets selector consistent.
+    renderBotAssetsSelector(getTrackedCoins());
+}
+
+function cloneClientBot(botId) {
+    const bots = getClientBotState();
+    const bot = bots.find((b) => b.id === botId);
+    if (!bot) return;
+    const copy = JSON.parse(JSON.stringify(bot));
+    copy.id = generateId('bot');
+    copy.name = `${bot.name || 'Bot'} (copy)`;
+    copy.state = 'draft';
+    copy.createdAt = new Date().toISOString();
+    copy.lastEventAt = null;
+    copy.stats = { trades: 0, realizedPnlUsd: 0, wins: 0, losses: 0 };
+    copy.positions = {};
+    bots.push(copy);
+    setClientBotState(bots);
+    renderBotsUI();
+}
+
+function simulateBotOneCyclePreview() {
+    const cfg = getBotConfigFromForm();
+    if (!cfg.assets || cfg.assets.length === 0) {
+        alert('Please select at least one asset from the tracked list.');
+        return;
+    }
+
+    const holdings = getClientPortfolioHoldings();
+    const holdingsSymbols = new Set(holdings.map((h) => h.symbol));
+    const actionableSymbols = (cfg.assets || []).filter((s) => holdingsSymbols.has(s));
+    if (!actionableSymbols.length) return;
+
+    // Update market prices first for realism.
+    simulateMarketPrices(holdings, actionableSymbols, cfg.intensity);
+
+    const symbol = actionableSymbols[Math.floor(Math.random() * actionableSymbols.length)];
+    const holding = getClientHoldingsBySymbol(holdings, symbol);
+    if (!holding) return;
+
+    const action = chooseAction(cfg, holding);
+    const currentPrice = Number(holding.currentPrice || 0);
+    if (!currentPrice || currentPrice <= 0) return;
+
+    const feePercent = cfg.intensity === 'high' ? 0.004 : cfg.intensity === 'low' ? 0.0025 : 0.003;
+    const slipPct = cfg.intensity === 'high' ? 0.0015 : cfg.intensity === 'low' ? 0.0008 : 0.001;
+    const effectivePrice = action === 'buy'
+        ? currentPrice * (1 + slipPct)
+        : currentPrice * (1 - slipPct);
+
+    const usdc = getClientHoldingsBySymbol(holdings, 'USDC');
+    const usdcQty = Number(usdc?.qty || 0);
+    const minUsdc = Number(cfg.minUsdc ?? 250);
+
+    const tradeSizeMode = cfg.tradeSizeMode || 'fixed_usd';
+    const tradeSizeValue = Number(cfg.tradeSizeValue || 500);
+    const percent = clamp(tradeSizeValue, 1, 100) / 100;
+
+    let usdTarget = 0;
+    if (tradeSizeMode === 'percent') {
+        usdTarget = action === 'buy'
+            ? usdcQty * percent
+            : Number(holding.qty || 0) * effectivePrice * percent;
+    } else {
+        usdTarget = Math.max(1, tradeSizeValue);
+    }
+
+    if (action === 'buy') {
+        if (usdcQty < minUsdc) {
+            appendClientBotEvent({
+                id: generateId('evt'),
+                botId: 'preview',
+                botName: `${cfg.name} (preview)`,
+                time: new Date().toISOString(),
+                type: 'skip',
+                symbol,
+                qtyDelta: 0,
+                price: effectivePrice,
+                usdValue: 0,
+                reason: `SKIP — USDC below minimum (${formatUSD(usdcQty)} < ${formatUSD(minUsdc)})`,
+            });
+            renderBotActivityUI();
+            return;
+        }
+        usdTarget = Math.min(usdTarget, Math.max(0, usdcQty - minUsdc));
+        if (usdTarget <= 1) {
+            appendClientBotEvent({
+                id: generateId('evt'),
+                botId: 'preview',
+                botName: `${cfg.name} (preview)`,
+                time: new Date().toISOString(),
+                type: 'skip',
+                symbol,
+                qtyDelta: 0,
+                price: effectivePrice,
+                usdValue: 0,
+                reason: `SKIP — not enough free USDC after minimum balance`,
+            });
+            renderBotActivityUI();
+            return;
+        }
+    }
+
+    let qtyDelta = 0;
+    let usdImpactSigned = 0;
+    if (action === 'buy') {
+        const qtyToBuy = usdTarget / effectivePrice;
+        const qtyAfterFee = qtyToBuy * (1 - feePercent);
+        qtyDelta = qtyAfterFee;
+        holding.qty = Number(holding.qty || 0) + qtyDelta;
+        if (usdc) usdc.qty = Math.max(0, usdcQty - usdTarget);
+        usdImpactSigned = usdTarget;
+    } else {
+        const sellable = Number(holding.qty || 0);
+        const qtyDesired = usdTarget / effectivePrice;
+        const sellQty = Math.min(sellable, qtyDesired);
+        if (sellQty <= 0) return;
+        qtyDelta = -sellQty;
+        holding.qty = Math.max(0, sellable - sellQty);
+        const usdReceived = sellQty * effectivePrice * (1 - feePercent);
+        if (usdc) usdc.qty = usdcQty + usdReceived;
+        usdImpactSigned = -usdReceived;
+    }
+    setClientPortfolioHoldings(holdings);
+
+    const event = {
+        id: generateId('evt'),
+        botId: 'preview',
+        botName: `${cfg.name} (preview)`,
+        time: new Date().toISOString(),
+        type: action,
+        symbol,
+        qtyDelta,
+        price: effectivePrice,
+        usdValue: usdImpactSigned,
+        reason: buildReason(cfg, action, symbol, holding),
+    };
+    appendClientBotEvent(event);
+
+    renderBotActivityUI();
+    renderPortfolio();
 }
 
 // ===== FILTERS =====
