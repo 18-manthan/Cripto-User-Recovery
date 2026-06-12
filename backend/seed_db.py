@@ -1,9 +1,11 @@
 """
-Database seeding — coherent crypto retention narratives for RUD demo.
+Database seeding — investor intelligence narratives for the platform demo.
 
 - Deterministic RNG for stable demos
-- Named personas with realistic compliance/support/acquisition stories
-- Procedural users: lifecycle-aware wallets & tickets, then rule-derived risk flags
+- Named LP / family-office personas with CRM, compliance, and onboarding stories
+- Procedural investors: lifecycle-aware AUM snapshots & tickets, then rule-derived alerts
+
+Re-run with --refresh to replace existing demo rows after narrative updates.
 """
 
 from __future__ import annotations
@@ -41,18 +43,20 @@ RISK_FLAG_TYPES = (
     "unusual_behavior",
 )
 
-ACQUISITION_SOURCES = ["twitter", "discord", "affiliate", "paid_ads", "organic", "referral", "content"]
+ACQUISITION_SOURCES = ["linkedin", "referral", "conference", "paid_search", "organic", "partner", "content"]
 LIFECYCLE_STAGES = ["onboarding", "active", "inactive", "churned", "high_value"]
 COUNTRIES = ["US", "UK", "DE", "SG", "JP", "AU", "CA", "NL", "FR", "CH", "HK", "UAE", "AE", "IN"]
 
+CUSTODIANS = ["schwab", "fidelity", "pershing", "sei", "internal_fund", "morgan_stanley"]
+
 TICKET_SUBJECTS = {
-    "kyc_delay": "KYC verification pending — additional documentation required",
-    "withdrawal_issue": "Withdrawal delayed / stuck in compliance review",
-    "login_problem": "Cannot complete 2FA / device verification",
-    "transaction_error": "On-chain deposit not credited after confirmations",
-    "compliance": "AML review: source of funds verification",
-    "account_locked": "Account access restricted pending review",
-    "API_issue": "Trading API rate limits / webhook delivery failures",
+    "kyc_delay": "KYC refresh — beneficial owner documentation required",
+    "withdrawal_issue": "Redemption request pending compliance sign-off",
+    "login_problem": "Investor portal MFA / device verification issue",
+    "transaction_error": "Statement vs custodian balance mismatch",
+    "compliance": "AML periodic review — source of wealth verification",
+    "account_locked": "Portal access restricted pending verification",
+    "API_issue": "Custodian data feed delay — positions stale",
 }
 
 ACTION_TYPES = [
@@ -108,17 +112,17 @@ def _p(
 DEMO_PERSONAS: List[Dict[str, Any]] = [
     _p(
         "demo_marcus_whale_kyc",
-        "marcus.wei@institutional.sg",
+        "marcus.wei@harborfamily.sg",
         "Marcus Wei",
-        "paid_ads",
+        "conference",
         "onboarding",
-        185_000.0,
+        1_850_000.0,
         "SG",
         28,
         2,
         {
-            "balance_usd": 520_000.0,
-            "blockchain": "ethereum",
+            "balance_usd": 5_200_000.0,
+            "blockchain": "pershing",
             "wallet_age_days": 510,
             "transaction_count": 12,
             "activity_score": 22.0,
@@ -130,22 +134,22 @@ DEMO_PERSONAS: List[Dict[str, Any]] = [
             "status": "open",
             "priority": "critical",
             "days_old": 17,
-            "subject": "Corporate KYC: UBO disclosure pending — legal escalation",
+            "subject": "Family office KYC: UBO disclosure pending — legal review",
         }],
     ),
     _p(
         "demo_elena_highvalue_withdrawal",
-        "elena.volkov@protonmail.com",
+        "elena.volkov@sterlingfo.demo",
         "Elena Volkov",
-        "discord",
+        "referral",
         "inactive",
-        92_000.0,
+        920_000.0,
         "DE",
         340,
         62,
         {
-            "balance_usd": 118_000.0,
-            "blockchain": "arbitrum",
+            "balance_usd": 1_180_000.0,
+            "blockchain": "fidelity",
             "wallet_age_days": 620,
             "transaction_count": 214,
             "activity_score": 31.0,
@@ -157,22 +161,22 @@ DEMO_PERSONAS: List[Dict[str, Any]] = [
             "status": "escalated",
             "priority": "critical",
             "days_old": 12,
-            "subject": "Large withdrawal held for compliance — user awaiting update",
+            "subject": "Fund redemption held for compliance — LP awaiting update",
         }],
     ),
     _p(
         "demo_james_active_healthy",
-        "james.okonkwo@gmail.com",
+        "james.okonkwo@oakline.demo",
         "James Okonkwo",
         "organic",
         "active",
-        12_500.0,
+        125_000.0,
         "US",
         400,
         1,
         {
-            "balance_usd": 18_400.0,
-            "blockchain": "ethereum",
+            "balance_usd": 184_000.0,
+            "blockchain": "schwab",
             "wallet_age_days": 400,
             "transaction_count": 156,
             "activity_score": 78.0,
@@ -184,22 +188,22 @@ DEMO_PERSONAS: List[Dict[str, Any]] = [
             "status": "resolved",
             "priority": "low",
             "days_old": 30,
-            "subject": "Minor deposit delay — resolved same day",
+            "subject": "Quarterly statement timing mismatch — resolved with custodian",
         }],
     ),
     _p(
         "demo_sofia_churned_compliance",
-        "sofia.martins@outlook.com",
+        "sofia.martins@martins-capital.demo",
         "Sofia Martins",
-        "affiliate",
+        "partner",
         "churned",
-        34_000.0,
+        340_000.0,
         "NL",
         540,
         200,
         {
-            "balance_usd": 900.0,
-            "blockchain": "polygon",
+            "balance_usd": 90_000.0,
+            "blockchain": "sei",
             "wallet_age_days": 540,
             "transaction_count": 44,
             "activity_score": 8.0,
@@ -211,22 +215,22 @@ DEMO_PERSONAS: List[Dict[str, Any]] = [
             "status": "pending",
             "priority": "high",
             "days_old": 45,
-            "subject": "AML alert: velocity mismatch — case opened with vendor",
+            "subject": "AML alert: capital movement pattern — case opened with compliance vendor",
         }],
     ),
     _p(
         "demo_alex_highvalue_quiet",
-        "alex.han@crypto-trader.io",
+        "alex.han@apex-partners.ae",
         "Alex Han",
-        "twitter",
+        "linkedin",
         "high_value",
-        210_000.0,
+        2_100_000.0,
         "AE",
         720,
         18,
         {
-            "balance_usd": 340_000.0,
-            "blockchain": "ethereum",
+            "balance_usd": 3_400_000.0,
+            "blockchain": "internal_fund",
             "wallet_age_days": 700,
             "transaction_count": 890,
             "activity_score": 33.0,
@@ -236,17 +240,17 @@ DEMO_PERSONAS: List[Dict[str, Any]] = [
     ),
     _p(
         "demo_priya_onboarding_stuck",
-        "priya.nair@web3.email",
+        "priya.nair@nairwealth.demo",
         "Priya Nair",
-        "paid_ads",
+        "paid_search",
         "onboarding",
-        48_000.0,
+        480_000.0,
         "IN",
         14,
         1,
         {
-            "balance_usd": 2_100.0,
-            "blockchain": "solana",
+            "balance_usd": 210_000.0,
+            "blockchain": "morgan_stanley",
             "wallet_age_days": 14,
             "transaction_count": 2,
             "activity_score": 18.0,
@@ -258,22 +262,22 @@ DEMO_PERSONAS: List[Dict[str, Any]] = [
             "status": "open",
             "priority": "high",
             "days_old": 6,
-            "subject": "Individual KYC: liveness check failed twice",
+            "subject": "Accredited investor verification: identity check requires manual review",
         }],
     ),
     _p(
         "demo_omar_paidads_ticket_cluster",
-        "omar.bakshi@blockchainmail.com",
+        "omar.bakshi@gulf-capital.demo",
         "Omar Bakshi",
-        "paid_ads",
+        "paid_search",
         "inactive",
-        61_000.0,
+        610_000.0,
         "UAE",
         180,
         41,
         {
-            "balance_usd": 54_000.0,
-            "blockchain": "ethereum",
+            "balance_usd": 540_000.0,
+            "blockchain": "pershing",
             "wallet_age_days": 180,
             "transaction_count": 88,
             "activity_score": 28.0,
@@ -286,7 +290,7 @@ DEMO_PERSONAS: List[Dict[str, Any]] = [
                 "status": "open",
                 "priority": "medium",
                 "days_old": 9,
-                "subject": "Device fingerprint mismatch — locked sessions",
+                "subject": "Investor portal device verification — repeated MFA failures",
             },
             {
                 "suffix": "b",
@@ -294,25 +298,25 @@ DEMO_PERSONAS: List[Dict[str, Any]] = [
                 "status": "open",
                 "priority": "high",
                 "days_old": 5,
-                "subject": "Bridge withdrawal pending manual review",
+                "subject": "Capital call acknowledgment overdue — distribution on hold",
             },
         ],
     ),
     _p(
         "demo_lisa_unusual_velocity",
-        "lisa.tan@exchange-risk.demo",
+        "lisa.tan@pacific-fo.demo",
         "Lisa Tan",
-        "affiliate",
+        "referral",
         "high_value",
-        138_000.0,
+        1_380_000.0,
         "SG",
         260,
         0,
         {
-            "balance_usd": 95_000.0,
-            "blockchain": "ethereum",
+            "balance_usd": 950_000.0,
+            "blockchain": "fidelity",
             "wallet_age_days": 260,
-            "transaction_count": 2400,
+            "transaction_count": 240,
             "activity_score": 71.0,
             "last_tx_days_ago": 0,
         },
@@ -322,22 +326,22 @@ DEMO_PERSONAS: List[Dict[str, Any]] = [
             "status": "open",
             "priority": "critical",
             "days_old": 2,
-            "subject": "Trading velocity spike correlated with new API keys",
+            "subject": "Unusual rebalancing velocity — multiple large allocation changes in 48h",
         }],
     ),
     _p(
         "demo_ken_referral_happy",
-        "ken.morita@gmail.com",
+        "ken.morita@morita-fo.jp",
         "Ken Morita",
         "referral",
         "active",
-        8_200.0,
+        82_000.0,
         "JP",
         200,
         0,
         {
-            "balance_usd": 11_800.0,
-            "blockchain": "optimism",
+            "balance_usd": 118_000.0,
+            "blockchain": "schwab",
             "wallet_age_days": 200,
             "transaction_count": 120,
             "activity_score": 82.0,
@@ -347,17 +351,17 @@ DEMO_PERSONAS: List[Dict[str, Any]] = [
     ),
     _p(
         "demo_rachel_compliance_only",
-        "rachel.green@protonmail.com",
+        "rachel.green@greenfamily.demo",
         "Rachel Green",
         "content",
         "active",
-        76_000.0,
+        760_000.0,
         "CA",
         300,
         3,
         {
-            "balance_usd": 102_000.0,
-            "blockchain": "bitcoin",
+            "balance_usd": 1_020_000.0,
+            "blockchain": "pershing",
             "wallet_age_days": 300,
             "transaction_count": 410,
             "activity_score": 68.0,
@@ -369,22 +373,22 @@ DEMO_PERSONAS: List[Dict[str, Any]] = [
             "status": "open",
             "priority": "high",
             "days_old": 8,
-            "subject": "Travel rule: counterparty VASP not responding — outbound paused",
+            "subject": "Cross-border wire documentation incomplete — outbound transfer paused",
         }],
     ),
     _p(
         "demo_tom_affiliate_drift",
-        "tom.schmidt@outlook.com",
+        "tom.schmidt@schmidt-capital.demo",
         "Tom Schmidt",
-        "affiliate",
+        "partner",
         "inactive",
-        19_000.0,
+        190_000.0,
         "DE",
         190,
         94,
         {
-            "balance_usd": 6_200.0,
-            "blockchain": "polygon",
+            "balance_usd": 62_000.0,
+            "blockchain": "sei",
             "wallet_age_days": 190,
             "transaction_count": 56,
             "activity_score": 19.0,
@@ -394,19 +398,19 @@ DEMO_PERSONAS: List[Dict[str, Any]] = [
     ),
     _p(
         "demo_nina_api_institutional",
-        "nina.kowalski@api-partner.demo",
+        "nina.kowalski@institutional.demo",
         "Nina Kowalski",
-        "paid_ads",
+        "conference",
         "high_value",
-        164_000.0,
+        1_640_000.0,
         "UK",
         410,
         1,
         {
-            "balance_usd": 210_000.0,
-            "blockchain": "ethereum",
+            "balance_usd": 2_100_000.0,
+            "blockchain": "internal_fund",
             "wallet_age_days": 410,
-            "transaction_count": 12_400,
+            "transaction_count": 420,
             "activity_score": 88.0,
             "last_tx_days_ago": 1,
         },
@@ -416,7 +420,7 @@ DEMO_PERSONAS: List[Dict[str, Any]] = [
             "status": "pending",
             "priority": "critical",
             "days_old": 4,
-            "subject": "FIX session: quoting engine lag — market-making desk impacted",
+            "subject": "Custodian SFTP feed delayed — positions stale for reporting desk",
         }],
     ),
 ]
@@ -466,8 +470,8 @@ def build_wallet(user_id: str, w: Dict[str, Any]) -> Wallet:
         transaction_count=int(w["transaction_count"]),
         activity_score=float(w["activity_score"]),
         last_activity_at=last_tx,
-        source_system="demo_blockchain",
-        external_id=f"chain_{user_id}",
+        source_system="demo_custodian",
+        external_id=f"custodian_{user_id}",
         last_synced_at=now,
     )
 
@@ -591,7 +595,7 @@ def derive_risk_flags(user: UserProfile, wallet: Wallet, tickets: Sequence[Suppo
             add_flag(
                 "onboarding_incomplete",
                 "medium",
-                f"Lifecycle=onboarding with low wallet engagement (tx={wallet.transaction_count}, activity_score={wallet.activity_score:.0f}).",
+                f"Lifecycle=onboarding with low portal engagement (touchpoints={wallet.transaction_count}, engagement_score={wallet.activity_score:.0f}).",
                 random.randint(3, 10),
             )
 
@@ -623,16 +627,16 @@ def derive_risk_flags(user: UserProfile, wallet: Wallet, tickets: Sequence[Suppo
         add_flag(
             "low_activity",
             "high" if user.estimated_ltv >= 150_000 else "medium",
-            f"High LTV (${user.estimated_ltv:,.0f}) but weak recent activity score ({wallet.activity_score:.0f}); balance ${wallet.balance_usd:,.0f}.",
+            f"High relationship value (${user.estimated_ltv:,.0f}) but weak engagement score ({wallet.activity_score:.0f}); reported AUM ${wallet.balance_usd:,.0f}.",
             random.randint(5, 20),
         )
 
     # Unusual behavior — velocity / volume outliers
-    if wallet.transaction_count >= 2000 and wallet.wallet_age_days < 400:
+    if wallet.transaction_count >= 180 and wallet.wallet_age_days < 400:
         add_flag(
             "unusual_behavior",
             "high",
-            f"Elevated tx velocity: {wallet.transaction_count} txs over ~{wallet.wallet_age_days}d — review automation/API usage.",
+            f"Elevated portal activity: {wallet.transaction_count} touchpoints over ~{wallet.wallet_age_days}d — review allocation change pattern.",
             random.randint(1, 5),
         )
 
@@ -741,7 +745,7 @@ def generate_wallet_procedural(lifecycle: str, ltv: float, last_activity_at: dat
 
     return {
         "balance_usd": balance,
-        "blockchain": random.choice(["ethereum", "polygon", "solana", "arbitrum", "optimism"]),
+        "blockchain": random.choice(CUSTODIANS),
         "wallet_age_days": wallet_age,
         "transaction_count": tx_count,
         "activity_score": activity_score,
@@ -870,9 +874,12 @@ def insert_user_bundle(
 
 def seed_demo_personas(db: Session) -> None:
     now = _now()
+    added = 0
+    skipped = 0
     for pdata in DEMO_PERSONAS:
         # Idempotency: skip if already present
         if db.get(UserProfile, pdata["id"]) is not None:
+            skipped += 1
             continue
         first_seen = now - timedelta(days=pdata["first_seen_days_ago"])
         last_act = now - timedelta(days=pdata["last_active_days_ago"])
@@ -891,21 +898,26 @@ def seed_demo_personas(db: Session) -> None:
             wallet_data=pdata["wallet"],
             tickets=tickets,
         )
+        added += 1
     db.commit()
-    print("✅ Seeded named demo personas (skipping existing rows)")
+    if skipped:
+        print(f"✅ Demo personas: added {added}, skipped {skipped} existing")
+    else:
+        print(f"✅ Demo personas: added {added}")
 
 
 def seed_campaigns(db: Session) -> None:
     # Idempotency: skip inserting rows that already exist
     existing = {row[0] for row in db.query(Campaign.id).all()}
     campaigns_data = [
-        ("campaign_twitter_001", "Twitter Growth Q1", "twitter", 50_000, 1200, 150_000),
-        ("campaign_discord_001", "Discord Community Q1", "discord", 25_000, 800, 120_000),
-        ("campaign_affiliate_001", "Affiliate Network Q1", "affiliate", 75_000, 3000, 400_000),
-        ("campaign_paid_ads_001", "Paid Search — High Intent", "paid_ads", 100_000, 2000, 250_000),
-        ("campaign_organic_001", "Organic Growth Q1", "organic", 0, 4000, 500_000),
-        ("campaign_content_001", "Content Marketing Q1", "content", 30_000, 1500, 200_000),
+        ("campaign_linkedin_001", "LinkedIn — Family Offices Q1", "linkedin", 62_000, 420, 890_000),
+        ("campaign_referral_001", "Partner Referral Program Q1", "referral", 18_000, 310, 620_000),
+        ("campaign_conference_001", "Wealth Conference Sponsorship", "conference", 45_000, 180, 540_000),
+        ("campaign_paid_search_001", "Google Search — HNW Investors", "paid_search", 98_000, 920, 1_250_000),
+        ("campaign_organic_001", "Organic Content Hub", "organic", 0, 2100, 1_800_000),
+        ("campaign_content_001", "Thought Leadership Q1", "content", 28_000, 640, 480_000),
     ]
+    added = 0
     for camp_id, name, channel, spend, conversions, revenue in campaigns_data:
         if camp_id in existing:
             continue
@@ -926,8 +938,13 @@ def seed_campaigns(db: Session) -> None:
                 last_synced_at=_now(),
             )
         )
+        added += 1
     db.commit()
-    print("✅ Seeded campaigns (skipping existing rows)")
+    skipped = len(campaigns_data) - added
+    if skipped:
+        print(f"✅ Campaigns: added {added}, skipped {skipped} existing")
+    else:
+        print(f"✅ Campaigns: added {added}")
 
 
 def seed_procedural_users(db: Session, count: int) -> None:
@@ -960,8 +977,8 @@ def seed_procedural_users(db: Session, count: int) -> None:
         insert_user_bundle(
             db,
             user_id=user_id,
-            email=f"{user_id}@rud-demo.local",
-            name=f"Proc User {i}",
+            email=f"{user_id}@investor-demo.local",
+            name=f"Investor Proc {i}",
             acquisition_source=random.choice(ACQUISITION_SOURCES),
             lifecycle_stage=lifecycle,
             estimated_ltv=ltv,
@@ -1005,14 +1022,41 @@ def print_stats(db: Session) -> None:
     print(f"\n  Named demo IDs (sample): {', '.join(p['id'] for p in DEMO_PERSONAS[:4])}…")
 
 
+def refresh_demo_data(db: Session) -> None:
+    """Drop seeded demo rows so narrative updates can be re-applied."""
+    print("🔄 Refreshing demo data (investors, alerts, workflows, tickets, campaigns)…")
+    db.query(RecoveryAction).delete()
+    db.query(RiskFlag).delete()
+    db.query(SupportTicket).delete()
+    db.query(Wallet).delete()
+    db.query(UserProfile).delete()
+    db.query(Campaign).delete()
+    db.commit()
+    print("  ✓ Cleared existing demo rows")
+
+
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Seed the Investor Intelligence Platform demo database")
+    parser.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Delete existing demo rows and re-seed with the latest investor narrative",
+    )
+    args = parser.parse_args()
+
     print("🚀 Starting database initialization…\n")
     init_db()
     db = SessionLocal()
     try:
+        if args.refresh:
+            refresh_demo_data(db)
         seed_campaigns(db)
         seed_users(db, num_procedural=388)
         print_stats(db)
         print("\n✅ Database seeding complete!")
+        if not args.refresh:
+            print("   Tip: run `python seed_db.py --refresh` after narrative updates to replace existing rows.")
     finally:
         db.close()

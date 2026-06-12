@@ -3,31 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>High-Value User Recovery Engine</title>
+    <title>Investor Intelligence Platform</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="icon" href="assets/favicon.png" type="image/png">
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="login-screen" class="auth-screen">
         <canvas id="auth-canvas" class="auth-canvas" aria-hidden="true"></canvas>
         <div class="auth-corner-brand" aria-label="Brand">
-            <img src="assets/rgcis-logo.png" alt="RGCIS logo" class="brand-logo-img brand-logo--img brand-logo-img--corner">
+            <img src="assets/platform-logo-wordmark.svg" alt="Investor Intelligence Platform" class="brand-logo-img brand-logo--img brand-logo-img--corner">
         </div>
         <div class="auth-card">
             <div class="auth-brand">
+                <img src="assets/platform-logo.svg" alt="" class="brand-logo-img brand-logo--img brand-logo-img--auth" width="72" height="72" aria-hidden="true">
                 <div class="auth-copy">
-                    <h1>High-Value User Recovery Engine</h1>
-                    <p>Turn Lost Crypto Users into Recovered Revenue - Instantly</p>
+                    <h1 id="brand-login-title">Investor Intelligence Platform</h1>
+                    <p id="brand-login-tagline">Transparency, automation, and performance for investors and partners</p>
                 </div>
             </div>
 
             <div class="auth-mode-toggle" role="tablist" aria-label="Login mode">
-                <button type="button" id="login-as-admin" class="auth-mode-btn active" role="tab" aria-selected="true">Admin</button>
-                <button type="button" id="login-as-client" class="auth-mode-btn" role="tab" aria-selected="false">Client</button>
+                <button type="button" id="login-as-admin" class="auth-mode-btn active" role="tab" aria-selected="true">Operations</button>
+                <button type="button" id="login-as-client" class="auth-mode-btn" role="tab" aria-selected="false">Investor</button>
             </div>
 
             <form id="login-form" class="auth-form">
@@ -53,8 +54,8 @@
                     <input type="password" id="client-login-password" class="auth-input" placeholder="demo" autocomplete="current-password" required>
                 </label>
                 <p class="auth-error" id="client-login-error" aria-live="polite"></p>
-                <button type="submit" class="auth-submit">Enter Portfolio</button>
-                <p class="auth-help-text">Demo credentials: <code>client@demo.com</code> / <code>demo</code></p>
+                <button type="submit" class="auth-submit">Enter Investor Portal</button>
+                <p class="auth-help-text" id="brand-investor-help">Demo credentials: <code>client@demo.com</code> / <code>demo</code></p>
             </form>
         </div>
     </div>
@@ -64,15 +65,16 @@
         <header class="header">
             <div class="header-content">
                 <h1>
-                    <img src="assets/rgcis-logo.png" alt="RGCIS logo" class="brand-logo-img brand-logo--img brand-logo-img--header">
-                    <span class="brand-title">High-Value User Recovery Engine</span>
+                    <img src="assets/platform-logo.svg" alt="" class="brand-logo-img brand-logo--img brand-logo-img--header" aria-hidden="true">
+                    <span class="brand-title" id="brand-header-title">Investor Intelligence Platform</span>
                 </h1>
-                <p>Real-time identification and recovery system for high-value crypto users</p>
+                <p id="brand-header-subtitle">Unified operations for investor engagement, portfolio visibility, and workflow automation</p>
             </div>
             <div class="health-status">
                 <span id="status-indicator" class="status-dot loading"></span>
                 <span id="status-text">Initializing...</span>
             </div>
+            <button id="reset-all-demo-btn" class="logout-btn demo-reset-btn" type="button" style="display:none;" title="Reset all demo local data">Reset Demo</button>
             <button id="logout-btn" class="logout-btn" type="button">Logout</button>
         </header>
 
@@ -98,28 +100,43 @@
             <aside class="sidebar">
                 <nav class="nav-menu">
                     <a href="#" data-section="overview" class="nav-item active">
-                        <i class="fas fa-chart-line icon"></i> Overview
+                        <i class="fas fa-chart-line icon"></i> Executive Overview
+                    </a>
+                    <a href="#" data-section="crm-pipeline" class="nav-item">
+                        <i class="fas fa-columns icon"></i> CRM Pipeline
+                    </a>
+                    <a href="#" data-section="marketing" class="nav-item">
+                        <i class="fas fa-bullhorn icon"></i> Marketing
+                    </a>
+                    <a href="#" data-section="ops-integrations" class="nav-item">
+                        <i class="fas fa-plug icon"></i> Integration Hub
                     </a>
                     <a href="#" data-section="risks" class="nav-item">
-                        <i class="fas fa-exclamation-triangle icon"></i> Risk Flags
+                        <i class="fas fa-exclamation-triangle icon"></i> Alerts & Opportunities
                     </a>
                     <a href="#" data-section="actions" class="nav-item">
-                        <i class="fas fa-bolt icon"></i>Tickets
-                    </a>
-                    <a href="#" data-section="scenarios" class="nav-item">
-                        <i class="fas fa-bullseye icon"></i> Scenarios
+                        <i class="fas fa-bolt icon"></i> Workflows
                     </a>
                     <a href="#" data-section="users" class="nav-item">
-                        <i class="fas fa-users icon"></i> Users
+                        <i class="fas fa-users icon"></i> Investors
+                    </a>
+                    <a href="#" data-section="investor-dashboard" class="nav-item client-only" style="display:none;">
+                        <i class="fas fa-home icon"></i> Dashboard
                     </a>
                     <a href="#" data-section="portfolio" class="nav-item client-only" style="display:none;">
                         <i class="fas fa-wallet icon"></i> Portfolio
                     </a>
+                    <a href="#" data-section="documents" class="nav-item client-only" style="display:none;">
+                        <i class="fas fa-file-alt icon"></i> Documents
+                    </a>
                     <a href="#" data-section="integrations" class="nav-item client-only" style="display:none;">
                         <i class="fas fa-plug icon"></i> Integrations
                     </a>
+                    <a href="#" data-section="investor-chat" class="nav-item client-only" style="display:none;">
+                        <i class="fas fa-comment-dots icon"></i> Investor Assistant
+                    </a>
                     <a href="#" data-section="chat" class="nav-item">
-                        <i class="fas fa-comments icon"></i> AI Chat
+                        <i class="fas fa-comments icon"></i> AI Assistant
                     </a>
                 </nav>
             </aside>
@@ -129,49 +146,139 @@
                 
                 <!-- Overview Section -->
                 <section id="overview" class="panel active">
-                    <h2>System Overview</h2>
+                    <h2 id="section-overview-title">Executive Overview</h2>
                     
                     <div class="overview-grid">
                         <div class="overview-card">
-                            <h3><i class="fas fa-chart-bar"></i> User Status Distribution</h3>
+                            <h3 id="section-user-status-chart"><i class="fas fa-chart-bar"></i> Investor Status Distribution</h3>
                             <div id="user-status-chart" class="chart-placeholder"></div>
                         </div>
                         
                         <div class="overview-card">
-                            <h3><i class="fas fa-warning"></i> Risk Severity Breakdown</h3>
+                            <h3 id="section-severity-chart"><i class="fas fa-warning"></i> Alert Severity Breakdown</h3>
                             <div id="severity-chart" class="chart-placeholder"></div>
                         </div>
                         
                         <div class="overview-card">
-                            <h3><i class="fas fa-dollar-sign animated-dollar"></i> Recovery Potential</h3>
+                            <h3 id="section-pipeline-value"><i class="fas fa-dollar-sign animated-dollar"></i> Pipeline Value</h3>
                             <div class="metric">
                                 <div class="metric-value" id="recovery-potential"><i class="fas fa-coins"></i> $0</div>
-                                <div class="metric-label">Estimated Full Value</div>
+                                <div class="metric-label" id="metric-pipeline-full">Estimated Full Value</div>
                             </div>
                             <div class="metric">
                                 <div class="metric-value" id="avg-recovery"><i class="fas fa-coins"></i> $0</div>
-                                <div class="metric-label">Avg Per Action</div>
+                                <div class="metric-label" id="metric-pipeline-avg">Avg Per Workflow</div>
                             </div>
                         </div>
                         
                         <div class="overview-card">
-                            <h3><i class="fas fa-list-check"></i> Action Summary</h3>
+                            <h3 id="section-action-summary"><i class="fas fa-list-check"></i> Workflow Summary</h3>
                             <div id="action-summary" class="action-summary"></div>
                         </div>
                     </div>
                 </section>
 
+                <!-- CRM Pipeline Section -->
+                <section id="crm-pipeline" class="panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2 id="section-crm-title"><i class="fas fa-columns"></i> CRM Pipeline</h2>
+                            <p class="section-help" id="section-crm-help">Track leads and investors from first touch through active engagement — demo kanban with drag-free stage moves.</p>
+                        </div>
+                        <button type="button" class="btn-secondary" onclick="resetCrmPipelineDemo()">Reset pipeline</button>
+                    </div>
+                    <div id="crm-pipeline-board" class="crm-pipeline-board"></div>
+                </section>
+
+                <!-- Marketing & Lead Gen (Operations) -->
+                <section id="marketing" class="panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2 id="section-marketing-title"><i class="fas fa-bullhorn"></i> Marketing & Lead Generation</h2>
+                            <p class="section-help" id="section-marketing-help">Capture leads, monitor campaigns, and track SEO performance — demo data with CRM handoff.</p>
+                        </div>
+                        <button type="button" class="btn-secondary" onclick="resetMarketingDemo()">Reset marketing demo</button>
+                    </div>
+                    <div id="marketing-kpis" class="investor-kpi-grid"></div>
+                    <div class="marketing-grid">
+                        <div class="overview-card marketing-card">
+                            <h3><i class="fas fa-user-plus"></i> Capture lead</h3>
+                            <form id="marketing-lead-form" class="marketing-lead-form" onsubmit="submitMarketingLead(event)">
+                                <label class="bot-field">
+                                    <span>Full name</span>
+                                    <input type="text" id="mkt-lead-name" class="bot-input" placeholder="Jane Investor" required />
+                                </label>
+                                <label class="bot-field">
+                                    <span>Email</span>
+                                    <input type="email" id="mkt-lead-email" class="bot-input" placeholder="jane@familyoffice.demo" required />
+                                </label>
+                                <label class="bot-field">
+                                    <span>Company</span>
+                                    <input type="text" id="mkt-lead-company" class="bot-input" placeholder="Family office / fund name" />
+                                </label>
+                                <label class="bot-field">
+                                    <span>Estimated AUM ($)</span>
+                                    <input type="number" id="mkt-lead-aum" class="bot-input" placeholder="500000" min="0" step="1000" />
+                                </label>
+                                <label class="bot-field">
+                                    <span>Source</span>
+                                    <select id="mkt-lead-source" class="bot-input">
+                                        <option value="Website">Website</option>
+                                        <option value="Google Ads">Google Ads</option>
+                                        <option value="LinkedIn">LinkedIn</option>
+                                        <option value="Referral">Referral</option>
+                                        <option value="Conference">Conference</option>
+                                    </select>
+                                </label>
+                                <button type="submit" class="btn-primary">Add lead</button>
+                            </form>
+                        </div>
+                        <div class="overview-card marketing-card">
+                            <h3><i class="fas fa-list"></i> Captured leads</h3>
+                            <div id="marketing-leads-list" class="marketing-leads-list"></div>
+                        </div>
+                        <div class="overview-card marketing-card">
+                            <h3><i class="fas fa-search"></i> SEO scorecard (demo)</h3>
+                            <div id="marketing-seo-panel"></div>
+                        </div>
+                        <div class="overview-card marketing-card marketing-card-wide">
+                            <h3><i class="fas fa-chart-bar"></i> Campaign performance</h3>
+                            <div id="marketing-campaigns-grid" class="marketing-campaigns-grid"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Operations Integration Hub -->
+                <section id="ops-integrations" class="panel">
+                    <div class="panel-header">
+                        <h2 id="section-ops-integrations-title"><i class="fas fa-plug"></i> Integration Hub</h2>
+                        <p class="section-help" id="section-ops-integrations-help">Connect CRM, marketing, and support systems — UI-only demo with sync logging.</p>
+                    </div>
+                    <div class="connector-topbar">
+                        <div class="connector-topbar-left">
+                            <div class="connector-topbar-title">Enterprise sync center</div>
+                            <div id="ops-connector-sync-subtitle" class="connector-topbar-subtitle">Connect a provider, then run a demo sync.</div>
+                        </div>
+                        <div class="connector-topbar-actions">
+                            <button type="button" class="btn-secondary" onclick="runAllOpsConnectorSync()">Sync all (demo)</button>
+                            <button type="button" class="btn-secondary" onclick="clearOpsConnectorSyncLog()">Clear log</button>
+                        </div>
+                    </div>
+                    <div id="ops-connector-sync-log" class="connector-sync-log"></div>
+                    <div id="ops-connectors-list" class="connector-list"></div>
+                </section>
+
                 <!-- Risk Flags Section -->
                 <section id="risks" class="panel">
                     <div class="panel-header">
-                        <h2>Detected Risk Flags</h2>
+                        <h2 id="section-risks-title">Alerts & Opportunities</h2>
                         <div class="filters">
                             <select id="risk-type-filter" class="filter-select">
-                                <option value="">All Risk Types</option>
+                                <option value="">All Alert Types</option>
                                 <option value="onboarding_delay">Onboarding Delay</option>
                                 <option value="inactivity">Inactivity</option>
                                 <option value="support_unresolved">Unresolved Support</option>
-                                <option value="abandoned">Abandoned Users</option>
+                                <option value="abandoned">Abandoned Investors</option>
                             </select>
                             <select id="risk-severity-filter" class="filter-select">
                                 <option value="">All Severities</option>
@@ -189,40 +296,131 @@
                 <!-- Actions Section -->
                 <section id="actions" class="panel">
                     <div class="panel-header">
-                        <h2>Recommended Actions</h2>
-                        <div class="filters">
-                            <select id="action-status-filter" class="filter-select">
-                                <option value="">All Statuses</option>
-                                <option value="pending">Pending</option>
-                                <option value="approved">Approved</option>
-                                <option value="executed">Executed</option>
-                            </select>
-                            <select id="action-priority-filter" class="filter-select">
-                                <option value="">All Priorities</option>
-                                <option value="critical">Critical</option>
-                                <option value="high">High</option>
-                                <option value="medium">Medium</option>
-                            </select>
+                        <h2 id="section-workflows-title">Workflow Automation</h2>
+                    </div>
+                    <div class="workflow-tabs" role="tablist" aria-label="Workflow views">
+                        <button type="button" class="workflow-tab active" data-workflow-tab="queue" role="tab" aria-selected="true">Queue</button>
+                        <button type="button" class="workflow-tab" data-workflow-tab="builder" role="tab" aria-selected="false">Builder</button>
+                    </div>
+                    <div id="workflow-queue-panel" class="workflow-tab-panel active">
+                        <div class="panel-header" style="margin-bottom: 1rem;">
+                            <p class="section-help" style="margin:0;">Approve and execute recommended workflow actions — execution opens an integration preview.</p>
+                            <div class="filters">
+                                <select id="action-status-filter" class="filter-select">
+                                    <option value="">All Statuses</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="approved">Approved</option>
+                                    <option value="executed">Executed</option>
+                                </select>
+                                <select id="action-priority-filter" class="filter-select">
+                                    <option value="">All Priorities</option>
+                                    <option value="critical">Critical</option>
+                                    <option value="high">High</option>
+                                    <option value="medium">Medium</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="actions-list" class="list-container"></div>
+                        <div id="actions-pagination" class="list-pagination" aria-label="Actions pagination"></div>
+                    </div>
+                    <div id="workflow-builder-panel" class="workflow-tab-panel">
+                        <p class="section-help" id="section-workflow-builder-help">Define trigger → action → channel rules. Saved workflows are demo-only (localStorage).</p>
+                        <div class="workflow-builder-form overview-card">
+                            <h3><i class="fas fa-wand-magic-sparkles"></i> Create workflow rule</h3>
+                            <div class="workflow-builder-grid">
+                                <label class="bot-field">
+                                    <span>Rule name</span>
+                                    <input type="text" id="wf-rule-name" class="bot-input" placeholder="e.g. Inactivity follow-up" />
+                                </label>
+                                <label class="bot-field">
+                                    <span>Trigger</span>
+                                    <select id="wf-trigger" class="bot-input">
+                                        <option value="alert_raised">Alert raised</option>
+                                        <option value="investor_onboarded">Investor onboarded</option>
+                                        <option value="inactivity_detected">Inactivity detected</option>
+                                        <option value="high_value_flag">High-value flag</option>
+                                        <option value="manual">Manual review</option>
+                                    </select>
+                                </label>
+                                <label class="bot-field">
+                                    <span>Action</span>
+                                    <select id="wf-action" class="bot-input">
+                                        <option value="email_outreach">Send email</option>
+                                        <option value="workflow_trigger">Trigger workflow</option>
+                                        <option value="priority_support">Priority support</option>
+                                        <option value="account_review">Account review</option>
+                                        <option value="incentive_offer">Incentive offer</option>
+                                    </select>
+                                </label>
+                                <label class="bot-field">
+                                    <span>Channel</span>
+                                    <select id="wf-channel" class="bot-input">
+                                        <option value="email">Email (SendGrid)</option>
+                                        <option value="salesforce">Salesforce</option>
+                                        <option value="hubspot">HubSpot</option>
+                                        <option value="zendesk">Zendesk</option>
+                                        <option value="jira">Jira</option>
+                                    </select>
+                                </label>
+                                <div class="bot-field bot-field-actions">
+                                    <button type="button" class="btn-primary" onclick="saveWorkflowRule()">Save rule</button>
+                                    <button type="button" class="btn-secondary" onclick="testWorkflowRuleFromForm()">Test preview</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="overview-card" style="margin-top: 1rem;">
+                            <h3><i class="fas fa-list-check"></i> Saved workflow rules</h3>
+                            <div id="workflow-rules-list" class="workflow-rules-list"></div>
                         </div>
                     </div>
-                    <div id="actions-list" class="list-container"></div>
-                    <div id="actions-pagination" class="list-pagination" aria-label="Actions pagination"></div>
-                </section>
-
-                <!-- Scenarios Section -->
-                <section id="scenarios" class="panel">
-                    <h2>Recovery Scenarios</h2>
-                    <div id="scenarios-grid" class="scenarios-grid"></div>
                 </section>
 
                 <!-- Users Section -->
                 <section id="users" class="panel">
                     <div class="panel-header">
-                        <h2>Users Database</h2>
-                        <input type="text" id="user-search" class="search-input" placeholder="Search by user ID or email...">
+                        <h2 id="section-investors-title">Investor Directory</h2>
+                        <input type="text" id="user-search" class="search-input" placeholder="Search by investor ID or email...">
                     </div>
                     <div id="users-list" class="list-container"></div>
                     <div id="users-pagination" class="list-pagination" aria-label="Users pagination"></div>
+                </section>
+
+                <!-- Investor Dashboard (client home) -->
+                <section id="investor-dashboard" class="panel">
+                    <div class="panel-header">
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; width:100%;">
+                            <div>
+                                <h2 id="section-investor-dashboard-title"><i class="fas fa-chart-pie"></i> Investor Dashboard</h2>
+                                <p class="section-help" id="section-investor-dashboard-help">Your portfolio at a glance — allocation, performance, and recent updates.</p>
+                            </div>
+                            <button type="button" class="btn-secondary" onclick="resetClientDemo()">Reset Demo</button>
+                        </div>
+                    </div>
+                    <div id="investor-dashboard-kpis" class="investor-kpi-grid"></div>
+                    <div class="investor-dashboard-grid">
+                        <div class="overview-card investor-dash-card">
+                            <h3><i class="fas fa-chart-pie"></i> Asset Allocation</h3>
+                            <div id="investor-allocation-chart" class="investor-allocation-chart"></div>
+                        </div>
+                        <div class="overview-card investor-dash-card">
+                            <h3><i class="fas fa-chart-line"></i> Performance (6 months)</h3>
+                            <div id="investor-performance-chart" class="investor-performance-chart"></div>
+                            <p class="portfolio-note">Demo performance curve — scales with your current portfolio value.</p>
+                        </div>
+                        <div class="overview-card investor-dash-card investor-dash-card-wide">
+                            <h3><i class="fas fa-bell"></i> Recent Updates</h3>
+                            <div id="investor-updates-feed" class="investor-updates-feed"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Documents (client-facing) -->
+                <section id="documents" class="panel">
+                    <div class="panel-header">
+                        <h2 id="section-documents-title"><i class="fas fa-folder-open"></i> Documents & Reports</h2>
+                        <p class="section-help" id="section-documents-help">Statements, performance reports, and compliance documents — demo downloads only.</p>
+                    </div>
+                    <div id="investor-documents-list" class="investor-documents-list"></div>
                 </section>
 
                 <!-- Portfolio Section (client-facing, demo-only UI) -->
@@ -230,8 +428,8 @@
                     <div class="panel-header">
                         <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; width:100%;">
                             <div>
-                                <h2><i class="fas fa-wallet"></i> Client Portfolio</h2>
-                                <p class="section-help">Demo-only portfolio view: no real trading or external integrations.</p>
+                                <h2 id="section-portfolio-title"><i class="fas fa-wallet"></i> Investor Portfolio</h2>
+                                <p class="section-help" id="section-portfolio-help">Demo holdings across funds, public markets, and cash — illustrative only, no live trading.</p>
                             </div>
                             <div style="display:flex; gap:0.7rem; flex-wrap:wrap;">
                                 <button type="button" class="btn-secondary" onclick="resetClientDemo()">Reset Demo</button>
@@ -242,121 +440,30 @@
                     <div id="portfolio-summary" class="portfolio-summary-grid"></div>
 
                     <div class="portfolio-grid">
-                        <div class="overview-card portfolio-card">
-                            <h3><i class="fas fa-coins"></i> Holdings</h3>
+                        <div class="overview-card portfolio-card portfolio-card-wide">
+                            <h3><i class="fas fa-layer-group"></i> Holdings</h3>
                             <div class="portfolio-table-wrap">
                                 <table class="portfolio-table">
                                     <thead>
                                         <tr>
-                                            <th>Coin</th>
-                                            <th>Qty</th>
-                                            <th>Price</th>
+                                            <th>Position</th>
+                                            <th>Class</th>
+                                            <th>Units</th>
+                                            <th>NAV</th>
                                             <th>Value</th>
-                                            <th>24h</th>
+                                            <th>MTD</th>
                                         </tr>
                                     </thead>
                                     <tbody id="portfolio-holdings-tbody"></tbody>
                                 </table>
                             </div>
-                            <p class="portfolio-note">Tip: Use “Track coins” to decide which coins to highlight in the dashboard.</p>
+                            <p class="portfolio-note">Toggle positions below to control what appears on your Investor Dashboard allocation chart.</p>
                         </div>
 
                         <div class="overview-card portfolio-card">
-                            <h3><i class="fas fa-thumbtack"></i> Track coins</h3>
+                            <h3><i class="fas fa-thumbtack"></i> Dashboard highlights</h3>
                             <div id="portfolio-track-tips" class="portfolio-track-tips"></div>
                             <div class="portfolio-track-list" id="portfolio-track-list"></div>
-                        </div>
-
-                        <div class="overview-card portfolio-card portfolio-card-wide">
-                            <h3><i class="fas fa-robot"></i> Bot Simulator (Demo)</h3>
-
-                            <div class="bot-form-grid">
-                                <label class="bot-field">
-                                    <span>Bot name</span>
-                                    <input type="text" id="bot-name" class="bot-input" value="Erase Me and give a name to your bot..." />
-                                </label>
-
-                                <div class="bot-field">
-                                    <span>Assets (from tracked list)</span>
-                                    <div id="bot-assets-select" class="bot-assets-select"></div>
-                                </div>
-
-                                <label class="bot-field">
-                                    <span>Mode</span>
-                                    <select id="bot-mode" class="bot-input">
-                                        <option value="buy">Buy</option>
-                                        <option value="sell">Sell</option>
-                                        <option value="both" selected>Both</option>
-                                    </select>
-                                </label>
-
-                                <label class="bot-field">
-                                    <span>Strategy</span>
-                                    <select id="bot-strategy" class="bot-input">
-                                        <option value="threshold">Threshold</option>
-                                        <option value="dca">DCA</option>
-                                        <option value="both" selected>Both (Threshold / DCA)</option>
-                                    </select>
-                                </label>
-
-                                <label class="bot-field">
-                                    <span>Intensity</span>
-                                    <select id="bot-intensity" class="bot-input">
-                                        <option value="low">Low</option>
-                                        <option value="medium" selected>Medium</option>
-                                        <option value="high">High</option>
-                                    </select>
-                                </label>
-
-                                <label class="bot-field">
-                                    <span>Trade size mode</span>
-                                    <select id="bot-trade-size-mode" class="bot-input">
-                                        <option value="fixed_usd" selected>Fixed USD</option>
-                                        <option value="percent">Percent</option>
-                                    </select>
-                                </label>
-
-                                <label class="bot-field">
-                                    <span>Trade size</span>
-                                    <input type="number" id="bot-trade-size" class="bot-input" value="500" min="1" step="1" />
-                                </label>
-
-                                <label class="bot-field">
-                                    <span>Execution interval</span>
-                                    <select id="bot-interval" class="bot-input">
-                                        <option value="5000">Every 5s</option>
-                                        <option value="10000" selected>Every 10s</option>
-                                        <option value="30000">Every 30s</option>
-                                    </select>
-                                </label>
-
-                                <label class="bot-field">
-                                    <span>Min USDC balance (buy guard)</span>
-                                    <input type="number" id="bot-min-usdc" class="bot-input" value="250" min="0" step="1" />
-                                </label>
-
-                                <label class="bot-field">
-                                    <span>Max exposure per asset (%)</span>
-                                    <input type="number" id="bot-max-exposure" class="bot-input" value="45" min="5" max="100" step="1" />
-                                </label>
-
-                                <div class="bot-field bot-field-actions">
-                                    <button type="button" id="bot-create-btn" class="btn-primary">Create Bot</button>
-                                    <button type="button" id="bot-cancel-edit-btn" class="btn-secondary" style="display:none;">Cancel edit</button>
-                                    <button type="button" id="bot-simulate-one-btn" class="btn-secondary">Simulate One Cycle</button>
-                                </div>
-                            </div>
-
-                            <div class="portfolio-bots-wrap">
-                                <h4>Created bots</h4>
-                                <div id="portfolio-bots-list" class="portfolio-bots-list"></div>
-                            </div>
-
-                            <div class="portfolio-bot-activity-wrap">
-                                <h4>Bot activity (mock)</h4>
-                                <div id="portfolio-bot-activity" class="portfolio-bot-activity"></div>
-                            </div>
-
                         </div>
                     </div>
                 </section>
@@ -364,8 +471,8 @@
                 <!-- Integrations Section (client-facing, demo-only UI) -->
                 <section id="integrations" class="panel">
                     <div class="panel-header">
-                        <h2><i class="fas fa-plug"></i> Integrations (Demo)</h2>
-                        <p class="section-help">UI-only connectors to show “plug & play” integration capability. No real API calls are made.</p>
+                        <h2 id="section-integrations-title"><i class="fas fa-plug"></i> Integrations (Demo)</h2>
+                        <p class="section-help" id="section-integrations-help">UI-only connectors to show plug-and-play integration capability. No real API calls are made.</p>
                     </div>
                     <div class="connector-topbar">
                         <div class="connector-topbar-left">
@@ -381,20 +488,47 @@
                     <div id="portfolio-connectors-list" class="connector-list"></div>
                 </section>
 
+                <!-- Investor AI Assistant (client-facing) -->
+                <section id="investor-chat" class="panel">
+                    <div class="panel-header">
+                        <h2 id="section-investor-chat-title"><i class="fas fa-robot"></i> Investor Assistant</h2>
+                        <p class="section-help" id="section-investor-chat-help">Ask about your portfolio, allocation, performance, documents, or connected accounts — instant demo answers, no backend required.</p>
+                    </div>
+                    <div class="chat-container investor-chat-container">
+                        <div id="investor-chat-messages" class="chat-messages">
+                            <div class="chat-message system" id="investor-chat-welcome">
+                                <p>👋 Hi — I'm your investor assistant. Ask about portfolio value, allocation, returns, documents, or connected accounts.</p>
+                                <p class="message-time">Try: "What's my total portfolio value?" or "Show my allocation"</p>
+                            </div>
+                        </div>
+                        <div class="chat-input-area">
+                            <input type="text" id="investor-chat-input" class="chat-input" placeholder="Ask about your portfolio, reports, or accounts…" autocomplete="off" />
+                            <button id="investor-chat-send-btn" class="chat-send-btn"><i class="fas fa-paper-plane"></i> Send</button>
+                        </div>
+                        <div class="investor-chat-suggestions">
+                            <span class="investor-chat-suggestions-label">Quick asks:</span>
+                            <button type="button" class="btn-secondary investor-chat-chip" onclick="sendInvestorChatSuggestion('What is my portfolio value?')">Portfolio value</button>
+                            <button type="button" class="btn-secondary investor-chat-chip" onclick="sendInvestorChatSuggestion('Show my allocation')">Allocation</button>
+                            <button type="button" class="btn-secondary investor-chat-chip" onclick="sendInvestorChatSuggestion('How are my returns?')">Returns</button>
+                            <button type="button" class="btn-secondary investor-chat-chip" onclick="sendInvestorChatSuggestion('What documents are available?')">Documents</button>
+                        </div>
+                    </div>
+                </section>
+
                 <!-- AI Chat Section -->
                 <section id="chat" class="panel">
                     <div class="panel-header">
-                        <h2><i class="fas fa-robot"></i> AI Database Chat</h2>
-                        <p class="section-help">You’re welcome to ask in plain language — the assistant is polite, stays close to your demo data, and understands recovery workflows in a crypto context. Verified SQL templates are used when possible; otherwise the model drafts a query for this database.</p>
+                        <h2 id="section-chat-title"><i class="fas fa-robot"></i> Operations AI Assistant</h2>
+                        <p class="section-help" id="section-chat-help">Ask in plain language — the assistant stays close to your demo data and understands investor operations, alerts, and workflows. Verified SQL templates are used when possible; otherwise the model drafts a query for this database.</p>
                     </div>
                     
                     <div class="chat-container">
                         <!-- Messages Display -->
                         <div id="chat-messages" class="chat-messages">
-                            <div class="chat-message system">
-                                <p>👋 Hello, I’m your recovery assistant. I’ll keep things courteous and focused on high-value user recovery (balances, activity, flags, and what an exchange-style team might do next).</p>
-                                <p class="message-time">Try, for example: “How many critical risk flags are there?” or “Show me high-value inactive users.”</p>
-                                <p class="chat-welcome-extra"><strong>Tip:</strong> Named demo users (such as <code>demo_elena_highvalue_withdrawal</code>) can open a playbook with optional next-step buttons — those are preview-only mockups, not live email, tickets, or CRM changes.</p>
+                            <div class="chat-message system" id="chat-welcome-msg">
+                                <p>👋 Hello — I’m your operations assistant. I’ll keep things courteous and focused on investor intelligence: portfolios, activity, alerts, and what your team might do next.</p>
+                                <p class="message-time">Try, for example: “How many critical alerts are there?” or “Show me high-value inactive investors.”</p>
+                                <p class="chat-welcome-extra"><strong>Tip:</strong> Named demo investors (such as <code>demo_elena_highvalue_withdrawal</code>) open playbooks with optional next-step buttons — preview-only mockups, not live CRM or custodian changes.</p>
                             </div>
                         </div>
 
@@ -404,7 +538,7 @@
                                 type="text" 
                                 id="chat-input" 
                                 class="chat-input" 
-                                placeholder="Ask about users, risks, or recovery — in your own words…"
+                                placeholder="Ask about investors, alerts, or workflows — in your own words…"
                                 autocomplete="off"
                             />
                             <button id="chat-send-btn" class="chat-send-btn">
@@ -430,7 +564,7 @@
     <div id="simulate-action-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="simulate-modal-title">
         <div class="modal-content simulate-modal-panel">
             <button type="button" class="modal-close simulate-modal-close" aria-label="Close preview">&times;</button>
-            <h2 id="simulate-modal-title" class="simulate-modal-title">Demo action preview</h2>
+            <h2 id="simulate-modal-title" class="simulate-modal-title">Workflow preview (demo)</h2>
             <p id="simulate-modal-intro" class="simulate-modal-intro"></p>
             <div id="simulate-modal-body" class="simulate-modal-body"></div>
             <details class="chat-sim-raw simulate-modal-raw">
@@ -440,6 +574,7 @@
         </div>
     </div>
 
+    <script src="demo-branding.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

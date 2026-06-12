@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 72" fill="none" role="img" aria-label="Investor Intelligence Platform">
+  <defs>
+    <linearGradient id="wm-bg" x1="4" y1="4" x2="60" y2="68" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B1220"/>
+      <stop offset="1" stop-color="#152238"/>
+    </linearGradient>
+    <linearGradient id="wm-ring" x1="14" y1="12" x2="50" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22D3EE"/>
+      <stop offset="1" stop-color="#14F195"/>
+    </linearGradient>
+    <linearGradient id="wm-a" x1="28" y1="16" x2="44" y2="38" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22D3EE"/>
+      <stop offset="1" stop-color="#0EA5C9"/>
+    </linearGradient>
+    <linearGradient id="wm-b" x1="16" y1="26" x2="32" y2="46" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#14F195"/>
+      <stop offset="1" stop-color="#0D9B6E"/>
+    </linearGradient>
+    <linearGradient id="wm-c" x1="24" y1="32" x2="40" y2="48" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A78BFA"/>
+      <stop offset="1" stop-color="#6366F1"/>
+    </linearGradient>
+    <linearGradient id="wm-text" x1="76" y1="20" x2="340" y2="52" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F8FAFC"/>
+      <stop offset="1" stop-color="#CFFAFE"/>
+    </linearGradient>
+  </defs>
+  <!-- mark -->
+  <rect x="4" y="6" width="60" height="60" rx="16" fill="url(#wm-bg)" stroke="rgba(34,211,238,0.3)" stroke-width="1.5"/>
+  <g transform="translate(34 38)">
+    <path d="M0-14 A14 14 0 0 1 12.12 7 L0 0 Z" fill="url(#wm-a)"/>
+    <path d="M12.12 7 A14 14 0 0 1-4.2 13.25 L0 0 Z" fill="url(#wm-b)"/>
+    <path d="M-4.2 13.25 A14 14 0 1 1 0-14 L0 0 Z" fill="url(#wm-c)" opacity="0.92"/>
+    <circle r="5" fill="#0B1220" stroke="url(#wm-ring)" stroke-width="1.5"/>
+  </g>
+  <path d="M16 50 L23 44 L30 47 L37 36 L44 40 L48 34" stroke="url(#wm-ring)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- wordmark -->
+  <text x="78" y="34" fill="url(#wm-text)" font-family="'Space Grotesk', 'Segoe UI', system-ui, sans-serif" font-size="22" font-weight="700" letter-spacing="-0.02em">Investor Intelligence</text>
+  <text x="78" y="56" fill="#94A3B8" font-family="'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif" font-size="13.5" font-weight="500" letter-spacing="0.06em">PLATFORM · RGCIS</text>
+</svg>

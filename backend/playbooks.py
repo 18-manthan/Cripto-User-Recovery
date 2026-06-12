@@ -123,25 +123,40 @@ def try_playbook(query: str, session: Dict[str, Any]) -> Tuple[Optional[str], Op
         sql = USER_SNAPSHOT_SQL.format(user_id=uid.replace("'", "''"))
         return sql, "user_recovery_snapshot", {"user_id": uid}
 
-    if re.search(r"\b(how many|count)\b.*\b(critical)\b.*\b(risk|flag)", n) or n == "critical risks":
+    if (
+        re.search(r"\b(how many|count)\b.*\b(critical)\b.*\b(risk|flag|alert)", n)
+        or n in ("critical risks", "critical alerts", "how many critical alerts")
+    ):
         return CRITICAL_RISK_COUNT_SQL, "critical_risk_count", {}
 
-    if re.search(r"\b(critical)\b.*\b(risk|risks|flag|flags)\b.*\b(user|users)\b", n) or re.search(
-        r"\b(show|list)\b.*\b(critical)\b.*\b(risk|risks|flag|flags)\b", n
+    if (
+        re.search(r"\b(critical)\b.*\b(risk|risks|flag|flags|alert|alerts)\b.*\b(user|users|investor|investors)\b", n)
+        or re.search(r"\b(show|list)\b.*\b(critical)\b.*\b(risk|risks|flag|flags|alert|alerts)\b", n)
     ):
         return CRITICAL_RISK_USERS_SQL, "critical_risk_users", {}
 
-    if ("pending" in n and "action" in n) or ("recovery" in n and "pending" in n and "action" in n):
+    if (
+        ("pending" in n and "action" in n)
+        or ("recovery" in n and "pending" in n and "action" in n)
+        or ("pending" in n and "workflow" in n)
+        or n in ("pending workflows", "pending workflow actions", "what workflows are pending")
+    ):
         return PENDING_ACTIONS_SQL, "pending_recovery_actions", {}
 
     # Prefer the "at risk" cohort slice over the generic list.
-    if ("high" in n and "value" in n and ("inactive" in n or "at risk" in n or "churn" in n or "drop" in n)):
+    if (
+        ("high" in n and "value" in n and ("inactive" in n or "at risk" in n or "churn" in n or "drop" in n))
+        or ("high" in n and "value" in n and "investor" in n and ("inactive" in n or "at risk" in n))
+    ):
         return HIGH_VALUE_AT_RISK_SQL, "high_value_at_risk", {}
 
-    # High-value users list (strict match so unrelated queries don't route here).
+    # High-value users/investors list (strict match so unrelated queries don't route here).
     if (
-        n in ("high value users", "high-value users", "show high value users", "list high value users")
-        or re.search(r"\b(high)[ -]value\b.*\b(users?)\b", n)
+        n in (
+            "high value users", "high-value users", "show high value users", "list high value users",
+            "high value investors", "high-value investors", "show high value investors", "list high value investors",
+        )
+        or re.search(r"\b(high)[ -]value\b.*\b(users?|investors?)\b", n)
     ):
         return HIGH_VALUE_USERS_SQL, "high_value_users", {}
 
@@ -174,12 +189,12 @@ def build_structured_extras(
         )
         bal = r.get("balance_usd")
         if bal is not None:
-            insights.append(f"Wallet balance ~**${float(bal):,.0f}**, activity score **{float(r.get('activity_score') or 0):.0f}/100**, tx count **{r.get('transaction_count', 0)}**.")
+            insights.append(f"Reported AUM ~**${float(bal):,.0f}**, engagement score **{float(r.get('activity_score') or 0):.0f}/100**, portal touchpoints **{r.get('transaction_count', 0)}**.")
         cr = int(r.get("critical_risks") or 0)
         tr = int(r.get("risk_flag_count") or 0)
         ot = int(r.get("open_tickets") or 0)
         pa = int(r.get("pending_actions") or 0)
-        insights.append(f"Risk flags: **{tr}** total (**{cr}** critical). Open support tickets: **{ot}**. Pending recovery actions: **{pa}**.")
+        insights.append(f"Alerts: **{tr}** total (**{cr}** critical). Open support tickets: **{ot}**. Pending workflow actions: **{pa}**.")
         if cr > 0:
             actions.append(
                 {
@@ -219,13 +234,13 @@ def build_structured_extras(
 
     elif playbook_id == "critical_risk_count":
         c = int(list(rows[0].values())[0]) if rows else 0
-        insights.append(f"**{c}** risk flags are currently **critical** severity.")
+        insights.append(f"**{c}** alerts are currently **critical** severity.")
         actions.append(
             {
                 "action_type": "workflow_trigger",
                 "priority": "critical",
                 "user_id": None,
-                "reason": "Triage critical flags cohort-wide in RUD Actions tab",
+                "reason": "Triage critical alerts cohort-wide in Workflows tab",
             }
         )
 
@@ -248,7 +263,7 @@ def build_structured_extras(
             )
 
     elif playbook_id == "pending_recovery_actions":
-        insights.append(f"Showing **{len(rows)}** pending recovery actions (top by priority and value).")
+        insights.append(f"Showing **{len(rows)}** pending workflow actions (top by priority and value).")
         if rows:
             top = rows[0]
             insights.append(
@@ -278,7 +293,7 @@ def build_structured_extras(
             )
 
     elif playbook_id == "high_value_users":
-        insights.append(f"Showing the top **{len(rows)}** users in the **high_value** lifecycle stage (sorted by LTV).")
+        insights.append(f"Showing the top **{len(rows)}** investors in the **high_value** lifecycle stage (sorted by LTV).")
         if rows:
             u = rows[0].get("user_id")
             if u:
@@ -308,6 +323,6 @@ def build_structured_extras(
             )
 
     else:
-        insights.append("Results retrieved; use the table below for detail. Ask a follow-up or name a user id for a tailored recovery plan.")
+        insights.append("Results retrieved; use the table below for detail. Ask a follow-up or name an investor id for a tailored engagement plan.")
 
     return insights, actions

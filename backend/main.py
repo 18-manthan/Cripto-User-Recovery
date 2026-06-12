@@ -26,8 +26,8 @@ from models import UserProfile, Wallet, RiskFlag, SupportTicket, RecoveryAction,
 from agent import query_agent
 
 app = FastAPI(
-    title="High-Value User Recovery Engine - Demo",
-    description="Real-time recovery system for high-value crypto users",
+    title="Investor Intelligence Platform - Demo",
+    description="Investor portals, CRM workflows, marketing, and BI for wealth and family-office operations",
     version="1.0.0"
 )
 
@@ -41,7 +41,7 @@ app.add_middleware(
 )
 
 ADMIN_USERS = {
-    "admin@cisinlabs.com": "cisin@321!",
+    "admin@cisinlabs.com": "cisin",
     "kuldeep@rgcis.ai": "rgcis#02",
     "manthan@manthan.ai": "123456",
     "rafael@rgcis.ai": "rgcis#02",
@@ -52,26 +52,58 @@ ACTIVE_TOKENS = set()
 def _mock_integration_payloads(action_type: str, user_id: Optional[str], reason: Optional[str]) -> Dict[str, Any]:
     """Demo-only payloads that would be webhooks / CRM / email in production."""
     uid = user_id or "cohort-wide"
-    r = reason or f"RUD playbook: {action_type}"
+    label = action_type.replace("_", " ").title()
+    r = reason or f"Investor workflow: {action_type}"
+    ts = datetime.utcnow().isoformat()
     return {
         "email": {
-            "provider": "mock_sendgrid",
-            "to": "vip-recovery@rud-demo.local",
-            "template_id": "retention_escalation",
-            "merge_fields": {"user_id": uid, "action_type": action_type},
+            "provider": "SendGrid",
+            "to": f"investor+{uid}@demo.local",
+            "cc": "ops@rgcis.demo",
+            "template_id": "investor_engagement_v2",
+            "merge_fields": {"user_id": uid, "action_type": action_type, "reason": r[:120]},
         },
         "jira": {
-            "project_key": "RUD",
+            "provider": "Atlassian Jira",
+            "project_key": "INV",
             "issue_type": "Task",
-            "summary": f"{action_type.replace('_', ' ').title()} — {uid}",
+            "summary": f"{label} — {uid}",
             "description": r,
-            "labels": ["rud-demo", action_type],
+            "labels": ["investor-demo", action_type],
         },
-        "crm": {
-            "provider": "mock_salesforce",
+        "salesforce": {
+            "provider": "Salesforce",
             "object": "Account",
-            "external_id_field": f"rud_user_{uid}",
-            "updates": {"Recovery_Status__c": action_type, "Last_RUD_Action__c": datetime.utcnow().isoformat()},
+            "external_id_field": f"investor_{uid}",
+            "updates": {
+                "Engagement_Status__c": action_type,
+                "Last_Workflow_Action__c": ts,
+                "Pipeline_Stage__c": "Active",
+            },
+        },
+        "hubspot": {
+            "provider": "HubSpot",
+            "object": "Contact",
+            "contact_id": f"hs_{uid}",
+            "updates": {
+                "lifecyclestage": "customer",
+                "last_workflow_action": label,
+                "notes": r[:200],
+            },
+        },
+        "zendesk": {
+            "provider": "Zendesk",
+            "ticket_subject": f"[Workflow] {label} for {uid}",
+            "priority": "high",
+            "tags": ["investor-portal", action_type],
+            "comment": r,
+        },
+        # Legacy key for older clients
+        "crm": {
+            "provider": "Salesforce",
+            "object": "Account",
+            "external_id_field": f"investor_{uid}",
+            "updates": {"Engagement_Status__c": action_type, "Last_Workflow_Action__c": ts},
         },
     }
 
@@ -409,6 +441,40 @@ async def execute_action(action_id: str, _: str = Depends(require_auth)):
         db.close()
 
 
+@app.get("/api/crm/investors")
+async def crm_investor_summaries(_: str = Depends(require_auth)):
+    """Investor summaries for CRM pipeline demo (stage derived from lifecycle)."""
+    db = SessionLocal()
+    try:
+        users = db.query(UserProfile).order_by(UserProfile.estimated_ltv.desc()).limit(60).all()
+
+        def stage_for(lifecycle: str, ltv: float) -> str:
+            if lifecycle in ("inactive", "churned"):
+                return "at_risk"
+            if lifecycle == "onboarding":
+                return "onboarded" if ltv >= 12000 else "qualified"
+            if lifecycle in ("active", "high_value"):
+                return "active"
+            return "qualified"
+
+        return {
+            "items": [
+                {
+                    "id": u.id,
+                    "name": u.name or u.id,
+                    "email": u.email,
+                    "stage": stage_for(u.lifecycle_stage or "", float(u.estimated_ltv or 0)),
+                    "value": float(u.estimated_ltv or 0),
+                    "source": u.acquisition_source or "organic",
+                    "kind": "investor",
+                }
+                for u in users
+            ]
+        }
+    finally:
+        db.close()
+
+
 @app.get("/api/users/{user_id}")
 async def get_user_details(user_id: str, _: str = Depends(require_auth)):
     """Get detailed user profile with related data"""
@@ -461,7 +527,8 @@ async def get_user_details(user_id: str, _: str = Depends(require_auth)):
                     "type": f.flag_type,
                     "severity": f.severity,
                     "description": f.description,
-                    "days_since_detection": f.days_since_detection
+                    "days_since_detection": f.days_since_detection,
+                    "detected_at": f.detected_at.isoformat() if f.detected_at else None,
                 }
                 for f in flags
             ],
@@ -471,51 +538,14 @@ async def get_user_details(user_id: str, _: str = Depends(require_auth)):
                     "type": a.action_type,
                     "status": a.status,
                     "priority": a.priority,
-                    "recovery_value": a.estimated_recovery_value
+                    "recovery_value": a.estimated_recovery_value,
+                    "reason": a.reason,
+                    "created_at": a.created_at.isoformat() if a.created_at else None,
+                    "executed_at": a.executed_at.isoformat() if a.executed_at else None,
                 }
                 for a in actions
             ]
         }
-    finally:
-        db.close()
-
-
-@app.get("/api/scenarios")
-async def get_scenario_breakdown(_: str = Depends(require_auth)):
-    """Get breakdown of recovery scenarios by risk type"""
-    db = SessionLocal()
-    try:
-        # Group risk flags by type
-        flag_types = ["onboarding_incomplete", "inactivity", "support_unresolved", "compliance_issue", "low_activity", "unusual_behavior"]
-        scenarios = {}
-        
-        for flag_type in flag_types:
-            flags = db.query(RiskFlag).filter(RiskFlag.flag_type == flag_type).all()
-            
-            if flags:
-                # Get severity breakdown
-                severity_breakdown = {}
-                for severity in ["critical", "high", "medium", "low"]:
-                    count = len([f for f in flags if f.severity == severity])
-                    if count > 0:
-                        severity_breakdown[severity] = count
-                
-                # Get total recovery potential for this flag type
-                total_recovery = 0
-                for flag in flags:
-                    actions = db.query(RecoveryAction).filter(
-                        RecoveryAction.user_id == flag.user_id
-                    ).all()
-                    total_recovery += sum([a.estimated_recovery_value for a in actions])
-                
-                scenarios[flag_type] = {
-                    "type": flag_type,
-                    "count": len(flags),
-                    "total_recovery_potential": f"${total_recovery:,.0f}",
-                    "severity_breakdown": severity_breakdown
-                }
-        
-        return {"scenarios": scenarios}
     finally:
         db.close()
 
@@ -556,7 +586,7 @@ async def serve_index():
     index_path = os.path.join(os.path.dirname(__file__), "..", "frontend", "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path, media_type="text/html")
-    return {"message": "RUD Demo API running. Use /api/* endpoints"}
+    return {"message": "Investor Intelligence Platform API running. Use /api/* endpoints"}
 
 
 if __name__ == "__main__":

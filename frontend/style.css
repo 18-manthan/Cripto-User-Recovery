@@ -105,8 +105,8 @@ body::after {
 
 .brand-logo-img--corner {
     height: auto;
-    width: min(320px, 44vw);
-    max-height: 86px;
+    width: min(300px, 42vw);
+    max-height: 72px;
 }
 
 .auth-canvas {
@@ -375,8 +375,8 @@ body::after {
     height: 56px;
     display: block;
     filter:
-        drop-shadow(0 12px 22px rgba(0, 0, 0, 0.40))
-        drop-shadow(0 0 22px rgba(34, 211, 238, 0.06));
+        drop-shadow(0 10px 20px rgba(0, 0, 0, 0.38))
+        drop-shadow(0 0 18px rgba(34, 211, 238, 0.12));
 }
 
 .brand-logo--img {
@@ -384,7 +384,8 @@ body::after {
 }
 
 .brand-logo-img--header {
-    height: 45px;
+    height: 48px;
+    width: 48px;
 }
 
 .brand-logo-img--auth {
@@ -2374,4 +2375,629 @@ button:disabled {
     border-radius: 6px;
     background: rgba(110, 231, 255, 0.12);
     color: var(--accent);
+}
+
+/* ===== Investor Portal (Phase 2) ===== */
+.investor-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+    margin-bottom: 1.25rem;
+}
+
+.investor-kpi-card .portfolio-summary-value {
+    font-size: 1.35rem;
+}
+
+.investor-kpi-pos {
+    color: #34d399 !important;
+}
+
+.investor-kpi-neg {
+    color: #f87171 !important;
+}
+
+.investor-dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+}
+
+.investor-dash-card-wide {
+    grid-column: 1 / -1;
+}
+
+.investor-dash-card h3 {
+    margin-bottom: 1rem;
+}
+
+.investor-alloc-row {
+    display: grid;
+    grid-template-columns: 120px 1fr 100px;
+    gap: 0.75rem;
+    align-items: center;
+    margin-bottom: 0.85rem;
+}
+
+.investor-alloc-label {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+.investor-alloc-pct {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    margin-left: auto;
+}
+
+.investor-alloc-bar-wrap {
+    height: 10px;
+    background: var(--bg-tertiary);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.investor-alloc-bar {
+    height: 100%;
+    border-radius: 999px;
+    min-width: 4px;
+}
+
+.investor-alloc-value {
+    text-align: right;
+    font-size: 0.86rem;
+    color: var(--text-secondary);
+    font-weight: 700;
+}
+
+.investor-perf-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.65rem;
+    height: 160px;
+    padding: 0.5rem 0 0;
+}
+
+.investor-perf-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100%;
+    justify-content: flex-end;
+    gap: 0.45rem;
+}
+
+.investor-perf-bar {
+    width: 100%;
+    max-width: 48px;
+    background: linear-gradient(180deg, var(--accent), var(--primary));
+    border-radius: 8px 8px 4px 4px;
+    min-height: 12px;
+    transition: height 0.3s ease;
+}
+
+.investor-perf-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 700;
+}
+
+.investor-perf-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid var(--line);
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+}
+
+.investor-updates-feed {
+    display: grid;
+    gap: 0.85rem;
+}
+
+.investor-update-item {
+    display: flex;
+    gap: 0.85rem;
+    padding: 0.9rem 1rem;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--line);
+    background: rgba(6, 14, 25, 0.45);
+}
+
+.investor-update-icon {
+    font-size: 1.35rem;
+    line-height: 1;
+}
+
+.investor-update-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.35rem;
+}
+
+.investor-update-time {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.investor-update-body p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+    line-height: 1.45;
+}
+
+.investor-documents-list {
+    display: grid;
+    gap: 0.85rem;
+}
+
+.investor-doc-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding: 1rem 1.1rem;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--line);
+    background: rgba(6, 14, 25, 0.45);
+}
+
+.investor-doc-icon {
+    font-size: 1.6rem;
+    width: 2.5rem;
+    text-align: center;
+}
+
+.investor-doc-meta {
+    flex: 1;
+    min-width: 200px;
+}
+
+.investor-doc-title {
+    font-weight: 800;
+    margin-bottom: 0.35rem;
+}
+
+.investor-doc-sub {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+}
+
+.investor-doc-type {
+    padding: 0.15em 0.5em;
+    border-radius: 6px;
+    background: rgba(110, 231, 255, 0.1);
+    color: var(--accent);
+    font-weight: 700;
+}
+
+.investor-doc-actions {
+    display: flex;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+}
+
+.investor-chat-container .chat-messages {
+    min-height: 280px;
+    max-height: 420px;
+}
+
+.investor-chat-suggestions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    padding: 0.65rem 0 0;
+    border-top: 1px solid var(--line);
+    margin-top: 0.5rem;
+}
+
+.investor-chat-suggestions-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-weight: 700;
+}
+
+.investor-chat-chip {
+    padding: 0.35rem 0.7rem !important;
+    min-height: auto !important;
+    font-size: 0.78rem !important;
+}
+
+@media (max-width: 900px) {
+    .investor-dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .investor-alloc-row {
+        grid-template-columns: 1fr;
+        gap: 0.35rem;
+    }
+
+    .investor-alloc-value {
+        text-align: left;
+    }
+}
+
+/* ===== Phase 3: CRM & Workflow Automation ===== */
+.crm-pipeline-board {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(180px, 1fr));
+    gap: 12px;
+    align-items: start;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+}
+
+.crm-column {
+    min-width: 180px;
+    background: rgba(6, 14, 25, 0.45);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 0.75rem;
+}
+
+.crm-column-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.55rem;
+    border-bottom: 1px solid var(--line);
+}
+
+.crm-column-title {
+    font-weight: 800;
+    font-size: 0.88rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--accent);
+}
+
+.crm-column-count {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 700;
+}
+
+.crm-cards {
+    display: grid;
+    gap: 0.65rem;
+}
+
+.crm-card {
+    padding: 0.75rem;
+    border-radius: 12px;
+    border: 1px solid rgba(110, 231, 255, 0.12);
+    background: rgba(8, 18, 32, 0.85);
+}
+
+.crm-card-kind {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    font-weight: 800;
+    margin-bottom: 0.35rem;
+}
+
+.crm-card-name {
+    font-weight: 800;
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem;
+    word-break: break-word;
+}
+
+.crm-card-meta {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+    margin-bottom: 0.55rem;
+}
+
+.crm-card-move {
+    width: 100%;
+    min-height: 34px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: rgba(6, 14, 26, 0.92);
+    color: var(--text);
+    font-size: 0.78rem;
+    padding: 0.35rem 0.5rem;
+}
+
+.workflow-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 0.5rem;
+}
+
+.workflow-tab {
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-weight: 800;
+    padding: 0.55rem 1rem;
+    border-radius: 10px 10px 0 0;
+    cursor: pointer;
+}
+
+.workflow-tab.active {
+    color: var(--text);
+    background: rgba(110, 231, 255, 0.08);
+    box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.workflow-tab-panel {
+    display: none;
+}
+
+.workflow-tab-panel.active {
+    display: block;
+}
+
+.workflow-builder-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-top: 0.75rem;
+}
+
+.workflow-rules-list {
+    display: grid;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+}
+
+.workflow-rule-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding: 0.9rem 1rem;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: rgba(6, 14, 25, 0.45);
+}
+
+.workflow-rule-card.disabled {
+    opacity: 0.55;
+}
+
+.workflow-rule-title {
+    font-weight: 800;
+    margin-bottom: 0.35rem;
+}
+
+.workflow-rule-meta {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    line-height: 1.45;
+}
+
+.workflow-rule-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.activity-timeline {
+    position: relative;
+    padding-left: 1.25rem;
+    margin-top: 0.5rem;
+}
+
+.activity-timeline::before {
+    content: '';
+    position: absolute;
+    left: 0.35rem;
+    top: 0.25rem;
+    bottom: 0.25rem;
+    width: 2px;
+    background: linear-gradient(180deg, var(--accent), transparent);
+    border-radius: 2px;
+}
+
+.activity-timeline-item {
+    position: relative;
+    margin-bottom: 1rem;
+    padding-left: 0.85rem;
+}
+
+.activity-timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -0.95rem;
+    top: 0.35rem;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.15);
+}
+
+.activity-timeline-time {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 700;
+    margin-bottom: 0.2rem;
+}
+
+.activity-timeline-title {
+    font-weight: 800;
+    font-size: 0.9rem;
+    margin-bottom: 0.15rem;
+}
+
+.activity-timeline-desc {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+@media (max-width: 1100px) {
+    .crm-pipeline-board {
+        grid-template-columns: repeat(5, minmax(220px, 1fr));
+    }
+
+    .workflow-builder-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ===== Phase 4: Marketing & Ops Integrations ===== */
+.marketing-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+}
+
+.marketing-card-wide {
+    grid-column: 1 / -1;
+}
+
+.marketing-card h3 {
+    margin-bottom: 1rem;
+}
+
+.marketing-lead-form {
+    display: grid;
+    gap: 12px;
+}
+
+.marketing-leads-list {
+    display: grid;
+    gap: 0.75rem;
+    max-height: 420px;
+    overflow-y: auto;
+}
+
+.marketing-lead-card {
+    padding: 0.85rem;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: rgba(6, 14, 25, 0.45);
+}
+
+.marketing-lead-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.35rem;
+}
+
+.marketing-lead-meta {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.55rem;
+}
+
+.marketing-lead-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.marketing-pushed-tag {
+    font-size: 0.78rem;
+    font-weight: 800;
+    color: var(--accent);
+}
+
+.marketing-seo-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    font-size: 0.88rem;
+}
+
+.marketing-seo-label {
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    margin-bottom: 0.2rem;
+}
+
+.marketing-seo-table {
+    margin-top: 0.5rem;
+}
+
+.marketing-campaigns-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 14px;
+}
+
+.marketing-campaign-card {
+    padding: 1rem;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: rgba(6, 14, 25, 0.45);
+}
+
+.marketing-campaign-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.35rem;
+}
+
+.marketing-campaign-channel {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+}
+
+.marketing-campaign-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.55rem;
+    font-size: 0.85rem;
+}
+
+.marketing-campaign-metrics span {
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+@media (max-width: 900px) {
+    .marketing-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ===== Phase 5: Demo Guide ===== */
+.demo-reset-btn {
+    margin-right: 0.5rem;
+    border-color: rgba(251, 191, 36, 0.35) !important;
+    color: #fbbf24 !important;
+}
+
+.header {
+    flex-wrap: wrap;
+    gap: 0.75rem;
 }

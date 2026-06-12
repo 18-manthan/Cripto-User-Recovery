@@ -7,12 +7,19 @@ const API_BASE = (typeof window !== 'undefined' && window.RUD_API_BASE)
 const AUTH_TOKEN_KEY = 'rud_admin_token';
 const CLIENT_AUTH_TOKEN_KEY = 'rud_client_token';
 
+function brandTerm(key, fallback) {
+    return window.DEMO_BRANDING?.terminology?.[key] ?? fallback;
+}
+
+function brandStat(key) {
+    return window.DEMO_BRANDING?.stats?.[key] ?? {};
+}
+
 // ===== STATE =====
 let appState = {
     stats: null,
     riskFlags: [],
     actions: [],
-    scenarios: null,
     users: [],
     filteredRisks: [],
     filteredActions: [],
@@ -20,6 +27,7 @@ let appState = {
 };
 let isChatInitialized = false;
 let uiMode = 'admin'; // 'admin' | 'client'
+const CLIENT_ONLY_SECTIONS = ['investor-dashboard', 'portfolio', 'documents', 'integrations', 'investor-chat'];
 
 // ===== LOGIN (CRYPTO) BACKDROP ANIMATION =====
 let authCanvasState = {
@@ -294,11 +302,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupNavigation();
     setupFilters();
     setupChatInterface();
+    setupInvestorChatInterface();
+    setupWorkflowTabs();
+    setupResetAllDemoButton();
     initAuthBackdrop();
 
     if (isClientAuthenticated()) {
         showClientApp();
-        renderPortfolio();
+        renderInvestorDashboard();
     } else if (isAuthenticated()) {
         showApp();
         await initializeApp();
@@ -318,6 +329,8 @@ function isAuthenticated() {
 function showLogin(errorMessage = '') {
     document.getElementById('login-screen')?.classList.remove('auth-hidden');
     document.getElementById('app-shell')?.classList.add('app-hidden');
+    const resetBtn = document.getElementById('reset-all-demo-btn');
+    if (resetBtn) resetBtn.style.display = 'none';
     const errorEl = document.getElementById('login-error');
     if (errorEl) errorEl.textContent = errorMessage;
     setLoginMode('admin');
@@ -332,7 +345,7 @@ function showApp() {
 
     // Restore admin navigation visibility.
     document.querySelectorAll('.nav-item').forEach((item) => {
-        if (item.dataset.section === 'portfolio' || item.dataset.section === 'integrations') item.style.display = 'none';
+        if (CLIENT_ONLY_SECTIONS.includes(item.dataset.section)) item.style.display = 'none';
         else item.style.display = '';
     });
 
@@ -347,6 +360,9 @@ function showApp() {
 
     document.querySelectorAll('.nav-item').forEach((item) => item.classList.remove('active'));
     document.querySelector('.nav-item[data-section="overview"]')?.classList.add('active');
+
+    const resetBtn = document.getElementById('reset-all-demo-btn');
+    if (resetBtn) resetBtn.style.display = '';
 }
 
 function clearSession() {
@@ -448,23 +464,26 @@ function showClientApp() {
     const text = document.getElementById('status-text');
     indicator?.classList.remove('loading');
     indicator?.classList.add('healthy');
-    if (text) text.textContent = 'Client Demo Ready';
+    if (text) text.textContent = 'Investor Portal Ready';
 
     // Hide top header widgets (stats grid + health banner) in client mode.
     hideTopHeaderWidgets();
 
-    // Show only client nav items (Portfolio + Integrations).
+    // Show only investor portal nav items.
     document.querySelectorAll('.nav-item').forEach((item) => {
-        if (item.dataset.section === 'portfolio' || item.dataset.section === 'integrations') item.style.display = '';
+        if (CLIENT_ONLY_SECTIONS.includes(item.dataset.section)) item.style.display = '';
         else item.style.display = 'none';
     });
 
-    // Activate default portfolio panel.
+    // Activate default investor dashboard.
     document.querySelectorAll('.panel').forEach((p) => p.classList.remove('active'));
-    document.getElementById('portfolio')?.classList.add('active');
+    document.getElementById('investor-dashboard')?.classList.add('active');
 
     document.querySelectorAll('.nav-item').forEach((item) => item.classList.remove('active'));
-    document.querySelector('.nav-item[data-section="portfolio"]')?.classList.add('active');
+    document.querySelector('.nav-item[data-section="investor-dashboard"]')?.classList.add('active');
+
+    const resetBtn = document.getElementById('reset-all-demo-btn');
+    if (resetBtn) resetBtn.style.display = '';
 }
 
 function setupClientAuth() {
@@ -488,9 +507,9 @@ function setupClientAuth() {
             localStorage.setItem(CLIENT_AUTH_TOKEN_KEY, String(Math.random()).slice(2));
             setLoginMode('client');
             showClientApp();
-            renderPortfolio();
+            renderInvestorDashboard();
         } else {
-            if (clientErrorEl) clientErrorEl.textContent = 'Invalid client credentials. Use client@demo.com / demo.';
+            if (clientErrorEl) clientErrorEl.textContent = 'Invalid investor credentials. Use client@demo.com / demo.';
         }
     });
 }
@@ -559,12 +578,20 @@ function setupNavigation() {
             
             // Render section content
             if (section === 'overview') renderOverview();
+            else if (section === 'crm-pipeline') renderCrmPipeline();
+            else if (section === 'marketing') renderMarketing();
+            else if (section === 'ops-integrations') renderOpsIntegrations();
             else if (section === 'risks') renderRiskFlags();
-            else if (section === 'actions') renderActions();
-            else if (section === 'scenarios') renderScenarios();
+            else if (section === 'actions') {
+                renderActions();
+                renderWorkflowRules();
+            }
             else if (section === 'users') renderUsers();
+            else if (section === 'investor-dashboard') renderInvestorDashboard();
             else if (section === 'portfolio') renderPortfolio();
+            else if (section === 'documents') renderDocuments();
             else if (section === 'integrations') renderIntegrations();
+            else if (section === 'investor-chat') renderInvestorChat();
             else if (section === 'chat') renderChat();
         });
     });
@@ -604,22 +631,18 @@ async function loadDashboardData() {
         appState.filteredRisks = appState.filteredRisks || appState.riskFlags;
         appState.actions = appState.actions || [];
         appState.filteredActions = appState.filteredActions || appState.actions;
-        appState.scenarios = appState.scenarios || {};
-
         renderStats();
 
         // Load all data in parallel
-        const [statsRes, risksRes, actionsRes, scenariosRes] = await Promise.all([
+        const [statsRes, risksRes, actionsRes] = await Promise.all([
             apiFetch(`${API_BASE}/dashboard/stats`),
             apiFetch(`${API_BASE}/risk-flags?limit=1000`),
             apiFetch(`${API_BASE}/actions?limit=1000`),
-            apiFetch(`${API_BASE}/scenarios`)
         ]);
         
         appState.stats = await statsRes.json();
         const risksData = await risksRes.json();
         const actionsData = await actionsRes.json();
-        appState.scenarios = await scenariosRes.json();
         
         appState.riskFlags = risksData.items || [];
         appState.filteredRisks = appState.riskFlags;
@@ -649,7 +672,6 @@ async function loadDashboardData() {
         appState.filteredRisks = [];
         appState.actions = [];
         appState.filteredActions = [];
-        appState.scenarios = {};
         renderStats();
     }
 }
@@ -694,24 +716,24 @@ function renderStats() {
     
     const stats = [
         {
-            title: 'Total Users',
+            title: brandStat('totalUsers').title || 'Total Investors',
             value: appState.stats.total_users,
-            label: 'Active + Inactive'
+            label: brandStat('totalUsers').label || 'Active + Inactive'
         },
         {
-            title: 'Risk Flags Detected',
+            title: brandStat('riskFlags').title || 'Alerts Detected',
             value: appState.stats.total_risk_flags,
-            label: 'Recovery Opportunities'
+            label: brandStat('riskFlags').label || 'Engagement Opportunities'
         },
         {
-            title: 'Actions Recommended',
+            title: brandStat('actions').title || 'Workflows Queued',
             value: appState.stats.total_actions,
-            label: 'Pending Execution'
+            label: brandStat('actions').label || 'Pending Execution'
         },
         {
-            title: 'Recovery Potential',
+            title: brandStat('pipeline').title || 'Pipeline Value',
             value: appState.stats.total_recovery_potential,
-            label: 'Estimated Total Value'
+            label: brandStat('pipeline').label || 'Estimated Total Value'
         }
     ];
     
@@ -795,7 +817,7 @@ function renderSeverityChart() {
                     <div style="height: 8px; background: var(--bg-tertiary); border-radius: 4px; overflow: hidden;">
                         <div style="height: 100%; width: ${percentage}%; background: ${colorMap[severity]}; border-radius: 4px; box-shadow: 0 0 8px ${colorMap[severity]}40;"></div>
                     </div>
-                    <span style="text-align: right; font-weight: 600; color: var(--text-secondary);">${count} flags</span>
+                    <span style="text-align: right; font-weight: 600; color: var(--text-secondary);">${count} alerts</span>
                 </div>
             </div>
         `;
@@ -839,7 +861,7 @@ function renderRiskFlags() {
     const paginationMountId = 'risk-flags-pagination';
     
     if (appState.filteredRisks.length === 0) {
-        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✅</div>No risk flags found</div>';
+        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✅</div>No alerts found</div>';
         document.getElementById(paginationMountId).innerHTML = '';
         return;
     }
@@ -885,7 +907,7 @@ function renderActions() {
     const paginationMountId = 'actions-pagination';
     
     if (appState.filteredActions.length === 0) {
-        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div>No actions found</div>';
+        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div>No workflows found</div>';
         document.getElementById(paginationMountId).innerHTML = '';
         return;
     }
@@ -908,15 +930,19 @@ function renderActions() {
                 ${action.reason}
             </div>
             <div class="list-item-footer">
-                <div class="list-item-value">Value: ${action.estimated_recovery_value}</div>
+                <div class="list-item-value">${brandTerm('listItemValue', 'Impact')}: ${action.estimated_recovery_value}</div>
                 <div class="button-group">
                     ${action.status === 'pending' ? `
                         <button class="btn-primary" onclick="approveAction('${action.action_id}')">Approve</button>
                         <button class="btn-secondary" onclick="executeAction('${action.action_id}')">Execute</button>
+                        <button class="btn-secondary" onclick="previewWorkflowAction('${action.action_id}')">Preview</button>
+                    ` : action.status === 'approved' ? `
+                        <button class="btn-primary" onclick="executeAction('${action.action_id}')">Execute</button>
+                        <button class="btn-secondary" onclick="previewWorkflowAction('${action.action_id}')">Preview</button>
                     ` : `
                         <button class="btn-secondary" disabled>${action.status}</button>
                     `}
-                    <button class="btn-secondary" onclick="viewUserDetail('${action.user_id}')">View User</button>
+                    <button class="btn-secondary" onclick="viewUserDetail('${action.user_id}')">View Investor</button>
                 </div>
             </div>
         </div>
@@ -932,41 +958,746 @@ function renderActions() {
     });
 }
 
-// ===== SCENARIOS RENDERING =====
-function renderScenarios() {
-    showTopHeaderWidgets();
-    const container = document.getElementById('scenarios-grid');
-    const scenarios = appState.scenarios?.scenarios || {};
-    
-    if (Object.keys(scenarios).length === 0) {
-        container.innerHTML = '<div class="empty-state" style="grid-column: 1/-1;"><div class="empty-state-icon">🎯</div>No scenarios detected</div>';
+// ===== CRM PIPELINE (Phase 3) =====
+const CRM_PIPELINE_KEY = 'rud_crm_pipeline';
+const CRM_STAGES = ['lead', 'qualified', 'onboarded', 'active', 'at_risk'];
+const CRM_STAGE_LABELS = {
+    lead: 'Lead',
+    qualified: 'Qualified',
+    onboarded: 'Onboarded',
+    active: 'Active',
+    at_risk: 'At Risk',
+};
+
+const CRM_SEED_LEADS = [
+    { id: 'lead_apex_cap', name: 'Apex Capital Partners', email: 'contact@apexcap.demo', value: 250000, source: 'Referral', stage: 'lead', kind: 'lead' },
+    { id: 'lead_northstar', name: 'Northstar Family Office', email: 'ops@northstar.demo', value: 180000, source: 'Conference', stage: 'lead', kind: 'lead' },
+    { id: 'lead_blue_oak', name: 'Blue Oak Ventures', email: 'hello@blueoak.demo', value: 95000, source: 'Paid Ads', stage: 'qualified', kind: 'lead' },
+];
+
+function getCrmPipelineState() {
+    try {
+        const raw = localStorage.getItem(CRM_PIPELINE_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
+        if (parsed && Array.isArray(parsed.cards)) return parsed;
+    } catch (e) {
+        // ignore
+    }
+    return { cards: [], initialized: false };
+}
+
+function setCrmPipelineState(state) {
+    localStorage.setItem(CRM_PIPELINE_KEY, JSON.stringify(state || { cards: [] }));
+}
+
+async function ensureCrmPipelineInitialized() {
+    const state = getCrmPipelineState();
+    if (state.initialized && state.cards.length) return state;
+
+    const cards = [...CRM_SEED_LEADS];
+    try {
+        const res = await apiFetch(`${API_BASE}/crm/investors`);
+        const data = await res.json();
+        if (res.ok && Array.isArray(data.items)) {
+            data.items.forEach((inv) => {
+                cards.push({
+                    id: inv.id,
+                    name: inv.name || inv.id,
+                    email: inv.email || '',
+                    value: Number(inv.value || 0),
+                    source: inv.source || 'organic',
+                    stage: inv.stage || 'qualified',
+                    kind: inv.kind || 'investor',
+                });
+            });
+        }
+    } catch (e) {
+        console.warn('CRM investor sync skipped:', e);
+    }
+
+    const next = { cards, initialized: true };
+    setCrmPipelineState(next);
+    return next;
+}
+
+function moveCrmCard(cardId, newStage) {
+    if (!CRM_STAGES.includes(newStage)) return;
+    const state = getCrmPipelineState();
+    const card = state.cards.find((c) => c.id === cardId);
+    if (!card) return;
+    card.stage = newStage;
+    setCrmPipelineState(state);
+    renderCrmPipeline();
+}
+
+function resetCrmPipelineDemo() {
+    if (!confirm('Reset CRM pipeline to demo seed + investors from database?')) return;
+    localStorage.removeItem(CRM_PIPELINE_KEY);
+    renderCrmPipeline();
+}
+
+async function renderCrmPipeline() {
+    const board = document.getElementById('crm-pipeline-board');
+    if (!board) return;
+
+    board.innerHTML = '<div class="empty-state"><div class="spinner"></div></div>';
+    const state = await ensureCrmPipelineInitialized();
+
+    board.innerHTML = CRM_STAGES.map((stage) => {
+        const cards = state.cards.filter((c) => c.stage === stage);
+        return `
+            <div class="crm-column">
+                <div class="crm-column-head">
+                    <span class="crm-column-title">${CRM_STAGE_LABELS[stage]}</span>
+                    <span class="crm-column-count">${cards.length}</span>
+                </div>
+                <div class="crm-cards">
+                    ${cards.map((card) => `
+                        <div class="crm-card">
+                            <div class="crm-card-kind">${escapeHtml(card.kind === 'lead' ? 'Lead' : 'Investor')}</div>
+                            <div class="crm-card-name">${escapeHtml(card.name)}</div>
+                            <div class="crm-card-meta">
+                                ${card.email ? `${escapeHtml(card.email)}<br>` : ''}
+                                ${formatUSD(card.value)} · ${escapeHtml(card.source || '')}
+                            </div>
+                            <select class="crm-card-move" onchange="moveCrmCard(${JSON.stringify(card.id)}, this.value)" aria-label="Move stage">
+                                ${CRM_STAGES.map((s) => `<option value="${s}" ${s === card.stage ? 'selected' : ''}>Move to ${CRM_STAGE_LABELS[s]}</option>`).join('')}
+                            </select>
+                        </div>
+                    `).join('') || '<p class="portfolio-note" style="margin:0;">No cards</p>'}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// ===== WORKFLOW BUILDER (Phase 3) =====
+const WORKFLOW_RULES_KEY = 'rud_workflow_rules';
+
+function getWorkflowRules() {
+    try {
+        const raw = localStorage.getItem(WORKFLOW_RULES_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
+        if (Array.isArray(parsed)) return parsed;
+    } catch (e) {
+        // ignore
+    }
+    return [];
+}
+
+function setWorkflowRules(rules) {
+    localStorage.setItem(WORKFLOW_RULES_KEY, JSON.stringify(rules || []));
+}
+
+function setupWorkflowTabs() {
+    document.querySelectorAll('.workflow-tab').forEach((tab) => {
+        tab.addEventListener('click', () => {
+            const target = tab.dataset.workflowTab;
+            document.querySelectorAll('.workflow-tab').forEach((t) => {
+                t.classList.toggle('active', t.dataset.workflowTab === target);
+                t.setAttribute('aria-selected', t.dataset.workflowTab === target ? 'true' : 'false');
+            });
+            document.getElementById('workflow-queue-panel')?.classList.toggle('active', target === 'queue');
+            document.getElementById('workflow-builder-panel')?.classList.toggle('active', target === 'builder');
+            if (target === 'builder') renderWorkflowRules();
+        });
+    });
+}
+
+function saveWorkflowRule() {
+    const name = document.getElementById('wf-rule-name')?.value.trim();
+    const trigger = document.getElementById('wf-trigger')?.value;
+    const action = document.getElementById('wf-action')?.value;
+    const channel = document.getElementById('wf-channel')?.value;
+    if (!name) {
+        alert('Please enter a rule name.');
         return;
     }
-    
-    container.innerHTML = Object.entries(scenarios).map(([key, scenario]) => `
-        <div class="scenario-card">
-            <h4>${getScenarioEmoji(scenario.type)} ${scenario.type.replace(/_/g, ' ')}</h4>
-            
-            <div class="scenario-metric">
-                <div class="scenario-metric-label">Total Users Affected</div>
-                <div class="scenario-metric-value">${scenario.count}</div>
-            </div>
-            
-            <div class="scenario-metric">
-                <div class="scenario-metric-label">Recovery Potential</div>
-                <div class="scenario-metric-value">${scenario.total_recovery_potential}</div>
-            </div>
-            
-            <div class="scenario-metric">
-                <div class="scenario-metric-label">Severity Distribution</div>
-                <div style="display: grid; gap: 0.5rem; font-size: 0.85rem;">
-                    ${Object.entries(scenario.severity_breakdown).map(([sev, count]) => 
-                        `<div style="display: flex; justify-content: space-between;"><span>${sev}</span><strong>${count}</strong></div>`
-                    ).join('')}
+    const rules = getWorkflowRules();
+    rules.unshift({
+        id: generateId('wf'),
+        name,
+        trigger,
+        action,
+        channel,
+        enabled: true,
+        createdAt: new Date().toISOString(),
+    });
+    setWorkflowRules(rules);
+    document.getElementById('wf-rule-name').value = '';
+    renderWorkflowRules();
+    showSuccess('Workflow rule saved (demo)');
+}
+
+function renderWorkflowRules() {
+    const list = document.getElementById('workflow-rules-list');
+    if (!list) return;
+    const rules = getWorkflowRules();
+    if (!rules.length) {
+        list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚡</div>No saved rules yet — create one above.</div>';
+        return;
+    }
+    list.innerHTML = rules.map((rule) => `
+        <div class="workflow-rule-card ${rule.enabled ? '' : 'disabled'}">
+            <div>
+                <div class="workflow-rule-title">${escapeHtml(rule.name)}</div>
+                <div class="workflow-rule-meta">
+                    <strong>When:</strong> ${escapeHtml(humanizeWorkflowKey(rule.trigger))}<br>
+                    <strong>Then:</strong> ${escapeHtml(humanizeWorkflowKey(rule.action))}<br>
+                    <strong>Via:</strong> ${escapeHtml(humanizeWorkflowChannel(rule.channel))}
                 </div>
+            </div>
+            <div class="workflow-rule-actions">
+                <button type="button" class="btn-secondary" onclick="toggleWorkflowRule('${rule.id}')">${rule.enabled ? 'Disable' : 'Enable'}</button>
+                <button type="button" class="btn-secondary" onclick="testWorkflowRule('${rule.id}')">Test preview</button>
+                <button type="button" class="btn-secondary" onclick="deleteWorkflowRule('${rule.id}')">Delete</button>
             </div>
         </div>
     `).join('');
+}
+
+function humanizeWorkflowKey(key) {
+    return String(key || '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function humanizeWorkflowChannel(channel) {
+    const map = {
+        email: 'Email (SendGrid)',
+        salesforce: 'Salesforce',
+        hubspot: 'HubSpot',
+        zendesk: 'Zendesk',
+        jira: 'Jira',
+    };
+    return map[channel] || channel;
+}
+
+function toggleWorkflowRule(ruleId) {
+    const rules = getWorkflowRules().map((r) => (r.id === ruleId ? { ...r, enabled: !r.enabled } : r));
+    setWorkflowRules(rules);
+    renderWorkflowRules();
+}
+
+function deleteWorkflowRule(ruleId) {
+    if (!confirm('Delete this workflow rule?')) return;
+    setWorkflowRules(getWorkflowRules().filter((r) => r.id !== ruleId));
+    renderWorkflowRules();
+}
+
+function testWorkflowRuleFromForm() {
+    const action = document.getElementById('wf-action')?.value || 'workflow_trigger';
+    const trigger = document.getElementById('wf-trigger')?.value || 'manual';
+    const name = document.getElementById('wf-rule-name')?.value.trim() || 'Workflow rule test';
+    runWorkflowSimulatePreview({
+        action_type: action,
+        user_id: null,
+        reason: `Demo test for rule "${name}" (trigger: ${trigger})`,
+    });
+}
+
+function testWorkflowRule(ruleId) {
+    const rule = getWorkflowRules().find((r) => r.id === ruleId);
+    if (!rule) return;
+    runWorkflowSimulatePreview({
+        action_type: rule.action,
+        user_id: null,
+        reason: `Demo test: ${rule.name} — trigger ${rule.trigger} via ${rule.channel}`,
+    });
+}
+
+async function previewWorkflowAction(actionId) {
+    const action = appState.actions.find((a) => a.action_id === actionId);
+    if (!action) return;
+    await runWorkflowSimulatePreview({
+        action_type: action.action_type,
+        user_id: action.user_id,
+        reason: action.reason || `Preview workflow ${action.action_type}`,
+    });
+}
+
+async function runWorkflowSimulatePreview(act) {
+    try {
+        const res = await apiFetch(`${API_BASE}/chat/simulate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action_type: act.action_type,
+                user_id: act.user_id || null,
+                reason: act.reason || null,
+            }),
+        });
+        const j = await res.json();
+        if (!res.ok || !j.success) {
+            throw new Error(j.detail || j.message || 'Simulate failed');
+        }
+        openSimulateActionModal({ mocks: j.mocks, logId: j.log_id, act });
+    } catch (e) {
+        console.error(e);
+        showError(e.message || 'Could not open workflow preview');
+    }
+}
+
+function buildActivityTimelineHtml(data) {
+    const user = data.user || {};
+    const events = [];
+
+    if (user.first_seen_at) {
+        events.push({
+            at: new Date(user.first_seen_at),
+            title: 'Account created',
+            desc: `Investor onboarded to platform (${user.acquisition_source || 'unknown source'}).`,
+            icon: 'account',
+        });
+    }
+    if (user.last_activity_at) {
+        events.push({
+            at: new Date(user.last_activity_at),
+            title: 'Last activity',
+            desc: `Most recent engagement recorded for ${user.name || user.id}.`,
+            icon: 'activity',
+        });
+    }
+
+    (data.tickets || []).forEach((t) => {
+        if (!t.created_at) return;
+        events.push({
+            at: new Date(t.created_at),
+            title: `Support: ${t.subject || t.category || 'Ticket'}`,
+            desc: `${t.category || 'general'} · ${t.status || 'open'} · priority ${t.priority || 'n/a'}`,
+            icon: 'ticket',
+        });
+    });
+
+    (data.risk_flags || []).forEach((f) => {
+        const at = f.detected_at ? new Date(f.detected_at) : new Date(Date.now() - (f.days_since_detection || 0) * 86400000);
+        events.push({
+            at,
+            title: `Alert: ${(f.type || 'flag').replace(/_/g, ' ')}`,
+            desc: `${f.severity || 'medium'} severity — ${f.description || ''}`,
+            icon: 'alert',
+        });
+    });
+
+    (data.recovery_actions || []).forEach((a) => {
+        const at = a.executed_at ? new Date(a.executed_at) : (a.created_at ? new Date(a.created_at) : new Date());
+        events.push({
+            at,
+            title: `Workflow: ${(a.type || 'action').replace(/_/g, ' ')}`,
+            desc: `${a.status || 'pending'} · ${brandTerm('recoveryValue', 'Impact')}: $${Number(a.recovery_value || 0).toLocaleString()}${a.reason ? ` — ${a.reason}` : ''}`,
+            icon: 'workflow',
+        });
+    });
+
+    events.sort((a, b) => b.at - a.at);
+    const top = events.slice(0, 12);
+    if (!top.length) {
+        return '<p class="portfolio-note">No activity recorded yet.</p>';
+    }
+
+    return `
+        <div class="activity-timeline">
+            ${top.map((ev) => `
+                <div class="activity-timeline-item">
+                    <div class="activity-timeline-time">${escapeHtml(ev.at.toLocaleString())}</div>
+                    <div class="activity-timeline-title">${escapeHtml(ev.title)}</div>
+                    <div class="activity-timeline-desc">${escapeHtml(ev.desc)}</div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+// ===== MARKETING & LEAD GEN (Phase 4) =====
+const MARKETING_LEADS_KEY = 'rud_marketing_leads';
+const MARKETING_SEED_LEADS = [
+    { id: 'mkt_seed_1', name: 'Harbor Wealth LLC', email: 'partners@harborwealth.demo', company: 'Harbor Wealth LLC', aum: 1200000, source: 'Google Ads', status: 'new', crmPushed: false, createdAt: '2026-03-28T10:00:00Z' },
+    { id: 'mkt_seed_2', name: 'Maya Chen', email: 'maya.chen@oakline.demo', company: 'Oakline Capital', aum: 750000, source: 'Conference', status: 'contacted', crmPushed: true, createdAt: '2026-03-25T14:30:00Z' },
+    { id: 'mkt_seed_3', name: 'Sterling Family Office', email: 'info@sterlingfo.demo', company: 'Sterling FO', aum: 2100000, source: 'Referral', status: 'qualified', crmPushed: true, createdAt: '2026-03-20T09:15:00Z' },
+];
+
+const MARKETING_CAMPAIGNS = [
+    { id: 'cmp_search', name: 'Google Search — HNW Investors', channel: 'Google Ads', status: 'active', spend: 12400, leads: 38, conversions: 11, roi: 2.4 },
+    { id: 'cmp_li', name: 'LinkedIn — Family Offices', channel: 'LinkedIn', status: 'active', spend: 8200, leads: 22, conversions: 6, roi: 1.9 },
+    { id: 'cmp_email', name: 'Q1 Nurture Sequence', channel: 'Mailchimp', status: 'paused', spend: 1200, leads: 54, conversions: 9, roi: 3.1 },
+    { id: 'cmp_seo', name: 'Organic Content Hub', channel: 'SEO', status: 'active', spend: 3500, leads: 41, conversions: 14, roi: 4.2 },
+];
+
+const MARKETING_SEO = {
+    score: 78,
+    traffic: 18420,
+    trafficChange: 12.4,
+    keywordsTop3: 24,
+    keywordsTop10: 89,
+    bounceRate: 38.2,
+    avgPosition: 14.6,
+    keywords: [
+        { term: 'family office portfolio platform', position: 3, volume: 1200, change: 2 },
+        { term: 'investor portal software', position: 7, volume: 2400, change: -1 },
+        { term: 'private wealth reporting', position: 11, volume: 1800, change: 4 },
+        { term: 'alternative investment dashboard', position: 9, volume: 900, change: 1 },
+        { term: 'investor transparency platform', position: 5, volume: 650, change: 3 },
+    ],
+};
+
+function getMarketingLeads() {
+    try {
+        const raw = localStorage.getItem(MARKETING_LEADS_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
+        if (Array.isArray(parsed) && parsed.length) return parsed;
+    } catch (e) {
+        // ignore
+    }
+    localStorage.setItem(MARKETING_LEADS_KEY, JSON.stringify(MARKETING_SEED_LEADS));
+    return [...MARKETING_SEED_LEADS];
+}
+
+function setMarketingLeads(leads) {
+    localStorage.setItem(MARKETING_LEADS_KEY, JSON.stringify(leads || []));
+}
+
+function resetMarketingDemo() {
+    if (!confirm('Reset marketing leads to demo seed data?')) return;
+    localStorage.removeItem(MARKETING_LEADS_KEY);
+    renderMarketing();
+}
+
+function submitMarketingLead(event) {
+    event.preventDefault();
+    const name = document.getElementById('mkt-lead-name')?.value.trim();
+    const email = document.getElementById('mkt-lead-email')?.value.trim();
+    const company = document.getElementById('mkt-lead-company')?.value.trim() || name;
+    const aum = Number(document.getElementById('mkt-lead-aum')?.value || 0);
+    const source = document.getElementById('mkt-lead-source')?.value || 'Website';
+    if (!name || !email) return;
+
+    const leads = getMarketingLeads();
+    leads.unshift({
+        id: generateId('mkt'),
+        name,
+        email,
+        company,
+        aum,
+        source,
+        status: 'new',
+        crmPushed: false,
+        createdAt: new Date().toISOString(),
+    });
+    setMarketingLeads(leads);
+    event.target.reset();
+    renderMarketing();
+    showSuccess('Lead captured (demo)');
+}
+
+function pushMarketingLeadToCrm(leadId) {
+    const leads = getMarketingLeads();
+    const lead = leads.find((l) => l.id === leadId);
+    if (!lead) return;
+    if (lead.crmPushed) {
+        alert('This lead is already in the CRM pipeline.');
+        return;
+    }
+
+    const crm = getCrmPipelineState();
+    const exists = crm.cards.some((c) => c.id === `mkt_${leadId}` || c.email === lead.email);
+    if (!exists) {
+        crm.cards.unshift({
+            id: `mkt_${leadId}`,
+            name: lead.company || lead.name,
+            email: lead.email,
+            value: Number(lead.aum || 0),
+            source: lead.source || 'Marketing',
+            stage: lead.status === 'qualified' ? 'qualified' : 'lead',
+            kind: 'lead',
+        });
+        crm.initialized = true;
+        setCrmPipelineState(crm);
+    }
+
+    lead.crmPushed = true;
+    lead.status = lead.status === 'new' ? 'contacted' : lead.status;
+    setMarketingLeads(leads);
+    renderMarketing();
+    showSuccess('Lead pushed to CRM Pipeline (demo)');
+}
+
+function renderMarketing() {
+    hideTopHeaderWidgets();
+    const kpiEl = document.getElementById('marketing-kpis');
+    const leadsEl = document.getElementById('marketing-leads-list');
+    const seoEl = document.getElementById('marketing-seo-panel');
+    const campaignsEl = document.getElementById('marketing-campaigns-grid');
+    if (!kpiEl || !leadsEl || !seoEl || !campaignsEl) return;
+
+    const leads = getMarketingLeads();
+    const totalLeads = leads.length;
+    const pushed = leads.filter((l) => l.crmPushed).length;
+    const totalAum = leads.reduce((s, l) => s + Number(l.aum || 0), 0);
+    const convRate = totalLeads ? ((pushed / totalLeads) * 100).toFixed(1) : '0.0';
+
+    kpiEl.innerHTML = `
+        <div class="portfolio-summary-item investor-kpi-card">
+            <div class="portfolio-summary-label">Leads captured</div>
+            <div class="portfolio-summary-value">${totalLeads}</div>
+        </div>
+        <div class="portfolio-summary-item investor-kpi-card">
+            <div class="portfolio-summary-label">Pipeline AUM (demo)</div>
+            <div class="portfolio-summary-value">${formatUSD(totalAum)}</div>
+        </div>
+        <div class="portfolio-summary-item investor-kpi-card">
+            <div class="portfolio-summary-label">CRM handoff rate</div>
+            <div class="portfolio-summary-value investor-kpi-pos">${convRate}%</div>
+        </div>
+        <div class="portfolio-summary-item investor-kpi-card">
+            <div class="portfolio-summary-label">SEO health score</div>
+            <div class="portfolio-summary-value">${MARKETING_SEO.score}/100</div>
+        </div>
+    `;
+
+    leadsEl.innerHTML = leads.length ? leads.map((lead) => `
+        <div class="marketing-lead-card">
+            <div class="marketing-lead-head">
+                <strong>${escapeHtml(lead.name)}</strong>
+                <span class="badge status-${lead.status === 'qualified' ? 'approved' : lead.status === 'contacted' ? 'pending' : 'executed'}">${escapeHtml(lead.status)}</span>
+            </div>
+            <div class="marketing-lead-meta">${escapeHtml(lead.email)} · ${escapeHtml(lead.source)} · ${formatUSD(lead.aum)}</div>
+            <div class="marketing-lead-actions">
+                ${lead.crmPushed
+                    ? '<span class="marketing-pushed-tag">In CRM</span>'
+                    : `<button type="button" class="btn-primary" onclick="pushMarketingLeadToCrm(${JSON.stringify(lead.id)})">Push to CRM</button>`}
+            </div>
+        </div>
+    `).join('') : '<p class="portfolio-note">No leads yet — use the form to capture one.</p>';
+
+    seoEl.innerHTML = `
+        <div class="marketing-seo-stats">
+            <div><span class="marketing-seo-label">Monthly organic traffic</span><strong>${MARKETING_SEO.traffic.toLocaleString()}</strong> <span class="investor-kpi-pos">+${MARKETING_SEO.trafficChange}%</span></div>
+            <div><span class="marketing-seo-label">Keywords in top 3</span><strong>${MARKETING_SEO.keywordsTop3}</strong></div>
+            <div><span class="marketing-seo-label">Keywords in top 10</span><strong>${MARKETING_SEO.keywordsTop10}</strong></div>
+            <div><span class="marketing-seo-label">Avg. position</span><strong>${MARKETING_SEO.avgPosition}</strong></div>
+        </div>
+        <table class="portfolio-table marketing-seo-table">
+            <thead><tr><th>Keyword</th><th>Pos.</th><th>Volume</th><th>Δ</th></tr></thead>
+            <tbody>
+                ${MARKETING_SEO.keywords.map((k) => `
+                    <tr>
+                        <td>${escapeHtml(k.term)}</td>
+                        <td>${k.position}</td>
+                        <td>${k.volume.toLocaleString()}</td>
+                        <td class="${k.change >= 0 ? 'portfolio-change pos' : 'portfolio-change neg'}">${k.change >= 0 ? '+' : ''}${k.change}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+
+    campaignsEl.innerHTML = MARKETING_CAMPAIGNS.map((c) => `
+        <div class="marketing-campaign-card">
+            <div class="marketing-campaign-head">
+                <strong>${escapeHtml(c.name)}</strong>
+                <span class="badge ${c.status === 'active' ? 'status-approved' : 'status-pending'}">${escapeHtml(c.status)}</span>
+            </div>
+            <div class="marketing-campaign-channel">${escapeHtml(c.channel)}</div>
+            <div class="marketing-campaign-metrics">
+                <div><span>Spend</span><strong>${formatUSD(c.spend)}</strong></div>
+                <div><span>Leads</span><strong>${c.leads}</strong></div>
+                <div><span>Conv.</span><strong>${c.conversions}</strong></div>
+                <div><span>ROI</span><strong class="investor-kpi-pos">${c.roi}x</strong></div>
+            </div>
+        </div>
+    `).join('');
+}
+
+// ===== OPS INTEGRATION HUB (Phase 4) =====
+const OPS_CONNECTOR_STATE_KEY = 'rud_ops_connectors';
+const OPS_CONNECTOR_SYNC_LOG_KEY = 'rud_ops_connector_sync_log';
+const OPS_CONNECTORS = [
+    { id: 'salesforce', name: 'Salesforce', description: 'CRM accounts, opportunities, and investor stages.', placeholder: 'Salesforce access token (demo)' },
+    { id: 'hubspot', name: 'HubSpot', description: 'Marketing contacts, lists, and nurture workflows.', placeholder: 'HubSpot private app token (demo)' },
+    { id: 'google_ads', name: 'Google Ads', description: 'Campaign spend, clicks, and conversion imports.', placeholder: 'Google Ads developer token (demo)' },
+    { id: 'mailchimp', name: 'Mailchimp', description: 'Email campaigns and audience segments.', placeholder: 'Mailchimp API key (demo)' },
+    { id: 'zendesk', name: 'Zendesk', description: 'Support tickets and SLA metrics.', placeholder: 'Zendesk API token (demo)' },
+    { id: 'slack', name: 'Slack', description: 'Ops alerts and workflow notifications.', placeholder: 'Slack bot token (demo)' },
+];
+
+function getOpsConnectorSyncLog() {
+    try {
+        const raw = localStorage.getItem(OPS_CONNECTOR_SYNC_LOG_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
+        if (Array.isArray(parsed)) return parsed;
+    } catch (e) { /* ignore */ }
+    const empty = [];
+    localStorage.setItem(OPS_CONNECTOR_SYNC_LOG_KEY, JSON.stringify(empty));
+    return empty;
+}
+
+function setOpsConnectorSyncLog(log) {
+    localStorage.setItem(OPS_CONNECTOR_SYNC_LOG_KEY, JSON.stringify(log || []));
+}
+
+function appendOpsConnectorSyncLogItem(item) {
+    const log = getOpsConnectorSyncLog();
+    log.push(item);
+    setOpsConnectorSyncLog(log.slice(Math.max(0, log.length - 50)));
+}
+
+function clearOpsConnectorSyncLog() {
+    setOpsConnectorSyncLog([]);
+    renderOpsConnectorSyncLog();
+}
+
+function getOpsConnectorState() {
+    try {
+        const raw = localStorage.getItem(OPS_CONNECTOR_STATE_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
+        if (parsed && typeof parsed === 'object') return parsed;
+    } catch (e) { /* ignore */ }
+    const empty = {};
+    localStorage.setItem(OPS_CONNECTOR_STATE_KEY, JSON.stringify(empty));
+    return empty;
+}
+
+function setOpsConnectorState(state) {
+    localStorage.setItem(OPS_CONNECTOR_STATE_KEY, JSON.stringify(state || {}));
+}
+
+function renderOpsConnectorSyncLog() {
+    const mount = document.getElementById('ops-connector-sync-log');
+    const subtitle = document.getElementById('ops-connector-sync-subtitle');
+    if (!mount) return;
+
+    const log = getOpsConnectorSyncLog().slice().reverse();
+    if (!log.length) {
+        mount.innerHTML = '<div class="connector-sync-item"><div class="connector-sync-item-body">No sync runs yet. Connect a provider and run a demo sync.</div></div>';
+        if (subtitle) subtitle.textContent = 'Connect a provider, then run a demo sync.';
+        return;
+    }
+
+    if (subtitle) {
+        const last = log[0]?.time ? new Date(log[0].time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+        subtitle.textContent = last ? `Last sync: ${last}` : 'Sync runs recorded below.';
+    }
+
+    mount.innerHTML = log.map((item) => {
+        const t = item.time ? new Date(item.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+        return `
+            <div class="connector-sync-item">
+                <div class="connector-sync-item-top">
+                    <div class="connector-sync-item-title">${escapeHtml(item.title || 'Sync run')}</div>
+                    <div class="connector-sync-item-meta">${escapeHtml(t)}</div>
+                </div>
+                <div class="connector-sync-item-body">${escapeHtml(item.body || '')}</div>
+            </div>
+        `;
+    }).join('');
+}
+
+function runOpsConnectorSync(connectorId) {
+    const connector = OPS_CONNECTORS.find((c) => c.id === connectorId);
+    if (!connector) return;
+    const state = getOpsConnectorState();
+    const s = state[connectorId] || { connected: false };
+    if (!s.connected) {
+        alert(`Please connect ${connector.name} first (demo).`);
+        return;
+    }
+
+    const now = new Date().toISOString();
+    const bodies = {
+        salesforce: `Synced ${14 + Math.floor(Math.random() * 20)} accounts and ${3 + Math.floor(Math.random() * 8)} opportunities into CRM Pipeline view (demo).`,
+        hubspot: `Imported ${22 + Math.floor(Math.random() * 30)} contacts and ${2 + Math.floor(Math.random() * 5)} marketing lists (demo).`,
+        google_ads: `Pulled ${4 + Math.floor(Math.random() * 6)} campaigns, ${1200 + Math.floor(Math.random() * 4000)} clicks, and ${18 + Math.floor(Math.random() * 25)} conversions into Marketing dashboard (demo).`,
+        mailchimp: `Updated ${3 + Math.floor(Math.random() * 4)} email campaigns and ${800 + Math.floor(Math.random() * 2000)} subscriber events (demo).`,
+        zendesk: `Imported ${6 + Math.floor(Math.random() * 12)} tickets and refreshed SLA dashboard metrics (demo).`,
+        slack: `Posted ${2 + Math.floor(Math.random() * 4)} workflow alerts to #investor-ops channel (demo).`,
+    };
+
+    state[connectorId] = { ...s, lastSyncAt: now };
+    setOpsConnectorState(state);
+    appendOpsConnectorSyncLogItem({
+        time: now,
+        title: `Synced ${connector.name}`,
+        body: bodies[connectorId] || 'Sync completed (demo).',
+        connectorId,
+    });
+    renderOpsConnectorSyncLog();
+    renderOpsConnectorsDemo();
+}
+
+function runAllOpsConnectorSync() {
+    const state = getOpsConnectorState();
+    const connected = OPS_CONNECTORS.filter((c) => state[c.id]?.connected);
+    if (!connected.length) {
+        alert('Connect at least one provider first (demo).');
+        return;
+    }
+    connected.forEach((c) => runOpsConnectorSync(c.id));
+}
+
+function toggleOpsConnector(connectorId) {
+    const connector = OPS_CONNECTORS.find((c) => c.id === connectorId);
+    if (!connector) return;
+    const state = getOpsConnectorState();
+    const current = state[connectorId] || { connected: false };
+    if (current.connected) {
+        state[connectorId] = { ...current, connected: false };
+        setOpsConnectorState(state);
+        renderOpsConnectorSyncLog();
+        renderOpsConnectorsDemo();
+        return;
+    }
+    const input = document.getElementById(`ops-connector-input-${connectorId}`);
+    const apiKey = input?.value ? String(input.value).trim() : '';
+    if (!apiKey) {
+        alert(`Please enter a token for ${connector.name} (demo).`);
+        return;
+    }
+    state[connectorId] = { connected: true, apiKey, connectedAt: new Date().toISOString(), lastSyncAt: null };
+    setOpsConnectorState(state);
+    renderOpsConnectorSyncLog();
+    renderOpsConnectorsDemo();
+}
+
+function renderOpsConnectorsDemo() {
+    const mount = document.getElementById('ops-connectors-list');
+    if (!mount) return;
+    const state = getOpsConnectorState();
+    mount.innerHTML = OPS_CONNECTORS.map((c) => {
+        const s = state[c.id] || { connected: false };
+        const connected = !!s.connected;
+        const statusText = connected ? 'Connected (demo)' : 'Not connected';
+        const statusClass = connected ? 'connector-status-pill--connected' : '';
+        const btnText = connected ? 'Disconnect' : 'Connect';
+        const btnClass = connected ? 'btn-secondary' : 'btn-primary';
+        const lastSyncAt = s.lastSyncAt ? new Date(s.lastSyncAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+        return `
+            <div class="connector-card">
+                <div class="connector-row">
+                    <div style="min-width: 220px;">
+                        <h4 style="margin:0 0 0.35rem 0;">${escapeHtml(c.name)}</h4>
+                        <div style="color: var(--text-muted); font-size: 0.9rem;">${escapeHtml(c.description)}</div>
+                    </div>
+                    <div><div class="connector-status-pill ${statusClass}">${escapeHtml(statusText)}</div></div>
+                </div>
+                <div class="connector-row" style="margin-top: 0.75rem;">
+                    <div class="connector-input">
+                        <input id="ops-connector-input-${c.id}" type="password" class="bot-input" placeholder="${escapeHtml(c.placeholder)}" ${connected ? 'disabled' : ''} />
+                    </div>
+                    <div class="connector-actions">
+                        <button type="button" class="${btnClass}" onclick="toggleOpsConnector('${c.id}')">${btnText}</button>
+                        <button type="button" class="btn-secondary" onclick="runOpsConnectorSync('${c.id}')" ${connected ? '' : 'disabled'}>Sync now</button>
+                    </div>
+                </div>
+                <div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.6rem;">
+                    Demo only — no external API calls.${lastSyncAt ? ` Last sync: ${escapeHtml(lastSyncAt)}` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderOpsIntegrations() {
+    hideTopHeaderWidgets();
+    renderOpsConnectorSyncLog();
+    renderOpsConnectorsDemo();
 }
 
 // ===== USERS RENDERING =====
@@ -1004,12 +1735,12 @@ function buildUserProfileInlineHtml(data) {
     if (wallet) {
         html += `
             <div class="user-detail-section">
-                <h3>Wallet</h3>
-                <div class="detail-row"><span class="detail-label">Blockchain:</span><span class="detail-value">${escapeHtml(wallet.blockchain || '')}</span></div>
-                <div class="detail-row"><span class="detail-label">Balance:</span><span class="detail-value">$${wallet.balance_usd ? escapeHtml(Number(wallet.balance_usd).toLocaleString()) : '0'}</span></div>
-                <div class="detail-row"><span class="detail-label">Activity Score:</span><span class="detail-value">${Number(wallet.activity_score || 0).toFixed(1)}/100</span></div>
-                <div class="detail-row"><span class="detail-label">Transactions:</span><span class="detail-value">${wallet.transaction_count || 0}</span></div>
-                <div class="detail-row"><span class="detail-label">Wallet Age:</span><span class="detail-value">${wallet.wallet_age_days || 0} days</span></div>
+                <h3>AUM Snapshot</h3>
+                <div class="detail-row"><span class="detail-label">Primary Custodian:</span><span class="detail-value">${escapeHtml(formatCustodianLabel(wallet.blockchain))}</span></div>
+                <div class="detail-row"><span class="detail-label">Reported AUM:</span><span class="detail-value">$${wallet.balance_usd ? escapeHtml(Number(wallet.balance_usd).toLocaleString()) : '0'}</span></div>
+                <div class="detail-row"><span class="detail-label">Engagement Score:</span><span class="detail-value">${Number(wallet.activity_score || 0).toFixed(1)}/100</span></div>
+                <div class="detail-row"><span class="detail-label">Portal Touchpoints:</span><span class="detail-value">${wallet.transaction_count || 0}</span></div>
+                <div class="detail-row"><span class="detail-label">Relationship Tenure:</span><span class="detail-value">${wallet.wallet_age_days || 0} days</span></div>
             </div>
         `;
     }
@@ -1040,7 +1771,7 @@ function buildUserProfileInlineHtml(data) {
     if (riskFlags.length) {
         html += `
             <div class="user-detail-section">
-                <h3>Risk Flags (${riskFlags.length})</h3>
+                <h3>${brandTerm('riskFlags', 'Alerts')} (${riskFlags.length})</h3>
                 ${riskFlags.map((flag) => `
                     <div style="margin-bottom: 0.9rem; padding: 0.85rem; background: var(--bg-alt); border-radius: 6px;">
                         <div style="margin-bottom: 0.5rem;">
@@ -1054,10 +1785,17 @@ function buildUserProfileInlineHtml(data) {
         `;
     }
 
+    html += `
+        <div class="user-detail-section">
+            <h3>Activity Timeline</h3>
+            ${buildActivityTimelineHtml(data)}
+        </div>
+    `;
+
     if (actions.length) {
         html += `
             <div class="user-detail-section">
-                <h3>Recovery Actions (${actions.length})</h3>
+                <h3>${brandTerm('recoveryActions', 'Workflow Actions')} (${actions.length})</h3>
                 ${actions.map((action) => `
                     <div style="margin-bottom: 0.9rem; padding: 0.85rem; background: var(--bg-alt); border-radius: 6px;">
                         <div style="margin-bottom: 0.5rem;">
@@ -1065,7 +1803,7 @@ function buildUserProfileInlineHtml(data) {
                             <span class="badge status-${escapeHtml(action.status || '')}" style="margin-left: 0.5rem;">${escapeHtml(action.status || '')}</span>
                         </div>
                         <div style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
-                            Recovery Value: $${Number(action.recovery_value || 0).toLocaleString()}
+                            ${brandTerm('recoveryValue', 'Estimated Impact')}: $${Number(action.recovery_value || 0).toLocaleString()}
                         </div>
                     </div>
                 `).join('')}
@@ -1097,9 +1835,10 @@ async function toggleInlineUserProfile(userId) {
 
     try {
         const response = await apiFetch(`${API_BASE}/users/${userId}`);
-        if (response.error) throw new Error(response.error || 'User not found');
+        const data = await response.json();
+        if (!response.ok || data.error) throw new Error(data.error || data.detail || 'User not found');
 
-        const html = buildUserProfileInlineHtml(response);
+        const html = buildUserProfileInlineHtml(data);
         inlineUserProfileCache[userId] = html;
         if (panel) panel.innerHTML = html;
     } catch (error) {
@@ -1114,7 +1853,7 @@ function renderUsers() {
     const paginationMountId = 'users-pagination';
     
     if (appState.filteredUsers.length === 0) {
-        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">👥</div>No users found</div>';
+        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">👥</div>No investors found</div>';
         document.getElementById(paginationMountId).innerHTML = '';
         return;
     }
@@ -1131,8 +1870,8 @@ function renderUsers() {
                     <div class="list-item-title">${userId}</div>
                 </div>
                 <div class="list-item-meta">
-                    <div><strong>Risk Flags:</strong> ${risks.length}</div>
-                    <div><strong>Actions:</strong> ${actions.length}</div>
+                    <div><strong>${brandTerm('riskFlags', 'Alerts')}:</strong> ${risks.length}</div>
+                    <div><strong>Workflows:</strong> ${actions.length}</div>
                 </div>
                 <div class="list-item-footer">
                     <button class="${expanded ? 'btn-secondary' : 'btn-primary'}" onclick="toggleInlineUserProfile('${userId}')">
@@ -1160,97 +1899,153 @@ function renderUsers() {
 }
 
 // ===== CLIENT PORTFOLIO (demo-only UI) =====
-const CLIENT_TRACKED_COINS_KEY = 'rud_client_tracked_coins';
-// Always-tracked platform coin (must exist in CLIENT_COIN_LIBRARY + CLIENT_DEMO_HOLDINGS)
-const PORTFOLIO_PLATFORM_COIN = 'RGCIS';
+const CLIENT_WATCHED_HOLDINGS_KEY = 'rud_client_tracked_coins';
+const PORTFOLIO_PLATFORM_HOLDING = 'RGCF';
 
-function getTrackedCoins() {
+const CLIENT_HOLDING_LIBRARY = [
+    { symbol: 'RGCF', name: 'RGCIS Growth Fund II', color: '#14f195', assetClass: 'Private Equity' },
+    { symbol: 'RGRE', name: 'RGCIS Real Estate Fund', color: '#fbbf24', assetClass: 'Real Estate' },
+    { symbol: 'VTSAX', name: 'Vanguard Total Stock', color: '#60a5fa', assetClass: 'Equities' },
+    { symbol: 'AGG', name: 'iShares Core Bond', color: '#a78bfa', assetClass: 'Fixed Income' },
+    { symbol: 'CASH', name: 'Cash & Equivalents', color: '#34d399', assetClass: 'Cash' },
+    { symbol: 'VCOP', name: 'Venture Co-Invest', color: '#8be8f6', assetClass: 'Ventures' },
+];
+
+const CLIENT_DEMO_HOLDINGS = [
+    { symbol: 'RGCF', qty: 850, avgPrice: 1000, currentPrice: 1185, change24h: 0.4 },
+    { symbol: 'RGRE', qty: 420, avgPrice: 500, currentPrice: 542, change24h: 0.2 },
+    { symbol: 'VTSAX', qty: 1200, avgPrice: 98, currentPrice: 104.5, change24h: -0.3 },
+    { symbol: 'AGG', qty: 800, avgPrice: 102, currentPrice: 101.2, change24h: 0.1 },
+    { symbol: 'CASH', qty: 185000, avgPrice: 1, currentPrice: 1, change24h: 0.0 },
+    { symbol: 'VCOP', qty: 150, avgPrice: 2500, currentPrice: 2680, change24h: 1.1 },
+];
+
+const CLIENT_PORTFOLIO_HOLDINGS_KEY = 'rud_client_portfolio_holdings';
+
+function getKnownClientHoldingSymbols() {
+    return CLIENT_HOLDING_LIBRARY.map((h) => h.symbol);
+}
+
+function getWatchedHoldings() {
     try {
-        const raw = localStorage.getItem(CLIENT_TRACKED_COINS_KEY);
+        const raw = localStorage.getItem(CLIENT_WATCHED_HOLDINGS_KEY);
         const parsed = raw ? JSON.parse(raw) : null;
         if (!Array.isArray(parsed)) throw new Error('bad');
-        const known = new Set(getKnownClientCoinSymbols());
+        const known = new Set(getKnownClientHoldingSymbols());
         const clean = parsed
             .map((c) => String(c))
             .filter(Boolean)
             .filter((sym) => known.has(sym));
-        if (!clean.includes(PORTFOLIO_PLATFORM_COIN)) clean.unshift(PORTFOLIO_PLATFORM_COIN);
+        if (!clean.includes(PORTFOLIO_PLATFORM_HOLDING)) clean.unshift(PORTFOLIO_PLATFORM_HOLDING);
         return Array.from(new Set(clean));
     } catch (e) {
-        return [PORTFOLIO_PLATFORM_COIN, 'BTC', 'ETH', 'USDC'];
+        return [PORTFOLIO_PLATFORM_HOLDING, 'RGRE', 'VTSAX', 'CASH'];
     }
 }
 
-function setTrackedCoins(coins) {
-    const known = new Set(getKnownClientCoinSymbols());
+function setWatchedHoldings(symbols) {
+    const known = new Set(getKnownClientHoldingSymbols());
     const withPlatform = Array.from(
-        new Set([PORTFOLIO_PLATFORM_COIN, ...(coins || [])].map((c) => String(c)).filter((sym) => known.has(sym)))
+        new Set([PORTFOLIO_PLATFORM_HOLDING, ...(symbols || [])].map((c) => String(c)).filter((sym) => known.has(sym)))
     );
-    localStorage.setItem(CLIENT_TRACKED_COINS_KEY, JSON.stringify(withPlatform));
+    localStorage.setItem(CLIENT_WATCHED_HOLDINGS_KEY, JSON.stringify(withPlatform));
 }
 
-const CLIENT_COIN_LIBRARY = [
-    { symbol: 'RGCIS', name: 'RGCIS Recovery Coin', color: '#14f195' },
-    { symbol: 'BTC', name: 'Bitcoin', color: '#fbbf24' },
-    { symbol: 'ETH', name: 'Ethereum', color: '#8be8f6' },
-    { symbol: 'SOL', name: 'Solana', color: '#34d399' },
-    { symbol: 'USDC', name: 'USD Coin', color: '#60a5fa' },
-    { symbol: 'LINK', name: 'Chainlink', color: '#a78bfa' },
-];
-
-function getKnownClientCoinSymbols() {
-    return CLIENT_COIN_LIBRARY.map((c) => c.symbol);
+function generateId(prefix) {
+    return `${prefix}_${Date.now()}_${String(Math.random()).slice(2, 8)}`;
 }
 
-const CLIENT_DEMO_HOLDINGS = [
-    { symbol: 'RGCIS', qty: 1200, avgPrice: 1.20, currentPrice: 1.65, change24h: 4.3 },
-    { symbol: 'BTC', qty: 0.42, avgPrice: 56000, currentPrice: 64500, change24h: -0.7 },
-    { symbol: 'ETH', qty: 18.7, avgPrice: 2800, currentPrice: 3230, change24h: 1.9 },
-    { symbol: 'USDC', qty: 25000, avgPrice: 1.0, currentPrice: 1.0, change24h: 0.0 },
-    { symbol: 'SOL', qty: 640, avgPrice: 120, currentPrice: 135, change24h: 3.1 },
-    { symbol: 'LINK', qty: 2200, avgPrice: 12.4, currentPrice: 15.1, change24h: -1.4 },
-];
+function formatUSD(n) {
+    const num = Number(n || 0);
+    return `$${num.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+}
 
-const CLIENT_PORTFOLIO_HOLDINGS_KEY = 'rud_client_portfolio_holdings';
-const CLIENT_BOTS_KEY = 'rud_client_bots';
-const CLIENT_BOT_EVENTS_KEY = 'rud_client_bot_events';
-const CLIENT_BOT_FORM_ASSETS_KEY = 'rud_client_bot_form_assets';
+function formatSignedUSD(n) {
+    const num = Number(n || 0);
+    const abs = Math.abs(num);
+    const sign = num < 0 ? '-' : '';
+    return `${sign}$${abs.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+}
 
-let clientBotIntervals = {}; // botId -> intervalId
-let clientBotExpandedPanels = {}; // botId -> boolean
-let clientBotsRestored = false;
-let clientBotUiBound = false;
-let clientBotEditingId = null;
-
-function resetClientDemo() {
-    const ok = confirm('Reset demo data? This will restore the original portfolio holdings and clear bots + bot activity + connector logs.');
-    if (!ok) return;
-
-    Object.values(clientBotIntervals).forEach((intervalId) => {
-        try {
-            clearInterval(intervalId);
-        } catch (e) {
-            // ignore
-        }
-    });
-
-    clientBotIntervals = {};
-    clientBotExpandedPanels = {};
-    clientBotsRestored = false;
-    clientBotEditingId = null;
-
+function resetClientDemoState() {
     localStorage.removeItem(CLIENT_PORTFOLIO_HOLDINGS_KEY);
-    localStorage.removeItem(CLIENT_BOTS_KEY);
-    localStorage.removeItem(CLIENT_BOT_EVENTS_KEY);
-    localStorage.removeItem(CLIENT_BOT_FORM_ASSETS_KEY);
+    localStorage.removeItem(CLIENT_WATCHED_HOLDINGS_KEY);
     localStorage.removeItem(CLIENT_CONNECTOR_STATE_KEY);
     localStorage.removeItem(CLIENT_CONNECTOR_SYNC_LOG_KEY);
+}
 
+function resetClientDemo() {
+    const ok = confirm('Reset demo data? This will restore default portfolio holdings and clear connector logs.');
+    if (!ok) return;
+    resetClientDemoState();
+    renderInvestorDashboard();
     renderPortfolio();
-    renderBotsUI();
-    renderBotActivityUI();
+    renderDocuments();
     renderConnectorsDemo();
     renderConnectorSyncLog();
+}
+
+function resetOpsDemoState() {
+    localStorage.removeItem(CRM_PIPELINE_KEY);
+    localStorage.removeItem(MARKETING_LEADS_KEY);
+    localStorage.removeItem(WORKFLOW_RULES_KEY);
+    localStorage.removeItem(OPS_CONNECTOR_STATE_KEY);
+    localStorage.removeItem(OPS_CONNECTOR_SYNC_LOG_KEY);
+}
+
+function seedPerfectOpsDemoPath() {
+    const leads = MARKETING_SEED_LEADS.map((l) => ({ ...l }));
+    if (leads[0]) leads[0] = { ...leads[0], crmPushed: false, status: 'new' };
+    setMarketingLeads(leads);
+    setWorkflowRules([
+        {
+            id: 'wf_seed_inactivity',
+            name: 'Inactivity nurture email',
+            trigger: 'inactivity_detected',
+            action: 'email_outreach',
+            channel: 'hubspot',
+            enabled: true,
+            createdAt: new Date().toISOString(),
+        },
+        {
+            id: 'wf_seed_alert',
+            name: 'Critical alert → Slack',
+            trigger: 'alert_raised',
+            action: 'workflow_trigger',
+            channel: 'slack',
+            enabled: true,
+            createdAt: new Date().toISOString(),
+        },
+    ]);
+}
+
+function resetAllDemoData() {
+    if (!confirm('Reset all demo local data? This restores showcase defaults for operations AND investor portal (backend database unchanged).')) return;
+    resetOpsDemoState();
+    resetClientDemoState();
+    seedPerfectOpsDemoPath();
+    localStorage.removeItem('rud_demo_checklist');
+    inlineUserProfileCache = {};
+    inlineExpandedUserId = null;
+
+    if (uiMode === 'client') {
+        showClientApp();
+        renderInvestorDashboard();
+        renderPortfolio();
+        renderDocuments();
+        renderConnectorsDemo();
+        renderConnectorSyncLog();
+    } else {
+        loadDashboardData().then(() => {
+            renderOverview();
+            updateHealthStatus();
+        });
+    }
+    showSuccess('Demo reset to showcase defaults');
+}
+
+function setupResetAllDemoButton() {
+    document.getElementById('reset-all-demo-btn')?.addEventListener('click', resetAllDemoData);
 }
 
 // ===== Connectors (Demo-only UI) =====
@@ -1258,21 +2053,27 @@ const CLIENT_CONNECTOR_STATE_KEY = 'rud_client_connectors';
 const CLIENT_CONNECTOR_SYNC_LOG_KEY = 'rud_client_connector_sync_log';
 const CLIENT_CONNECTORS = [
     {
-        id: 'coinbase',
-        name: 'Coinbase',
-        description: 'Connect exchange account (demo only).',
-        placeholder: 'Paste API key (demo)'
+        id: 'plaid',
+        name: 'Plaid',
+        description: 'Banking & custody account aggregation (demo only).',
+        placeholder: 'Paste Plaid secret (demo)'
+    },
+    {
+        id: 'salesforce_investor',
+        name: 'Salesforce Investor Portal',
+        description: 'Sync investor relationship data (demo only).',
+        placeholder: 'Paste Salesforce token (demo)'
+    },
+    {
+        id: 'docusign',
+        name: 'DocuSign',
+        description: 'Statements and subscription documents (demo only).',
+        placeholder: 'Paste integration key (demo)'
     },
     {
         id: 'yahoo',
         name: 'Yahoo Finance',
-        description: 'Pull market price snapshots (demo only).',
-        placeholder: 'Paste API key (demo)'
-    },
-    {
-        id: 'etherscan',
-        name: 'Etherscan / Block Explorer',
-        description: 'Enrich wallet activity (demo only).',
+        description: 'Market price snapshots for portfolio holdings (demo only).',
         placeholder: 'Paste API key (demo)'
     },
 ];
@@ -1370,16 +2171,22 @@ function runConnectorSync(connectorId) {
                 body: `Fetched ${60 + Math.floor(Math.random() * 80)} market price snapshots. Updated portfolio pricing + 24h change view (demo).`
             };
         }
-        if (connectorId === 'coinbase') {
+        if (connectorId === 'plaid') {
             return {
                 title: `Synced ${connector.name}`,
-                body: `Imported ${1 + Math.floor(Math.random() * 3)} exchange account(s), ${2 + Math.floor(Math.random() * 5)} wallet(s), and ${120 + Math.floor(Math.random() * 280)} transactions (demo).`
+                body: `Linked ${1 + Math.floor(Math.random() * 2)} institution(s) and imported ${3 + Math.floor(Math.random() * 6)} custody accounts (demo).`
             };
         }
-        if (connectorId === 'etherscan') {
+        if (connectorId === 'salesforce_investor') {
             return {
                 title: `Synced ${connector.name}`,
-                body: `Enriched ${20 + Math.floor(Math.random() * 80)} on-chain events and flagged ${1 + Math.floor(Math.random() * 5)} anomalies for review (demo).`
+                body: `Pulled investor profile updates and ${2 + Math.floor(Math.random() * 5)} document status changes (demo).`
+            };
+        }
+        if (connectorId === 'docusign') {
+            return {
+                title: `Synced ${connector.name}`,
+                body: `Retrieved ${1 + Math.floor(Math.random() * 4)} signed agreements and ${1 + Math.floor(Math.random() * 3)} pending envelopes (demo).`
             };
         }
         return {
@@ -1517,7 +2324,7 @@ function getClientPortfolioHoldings() {
         if (raw) {
             const parsed = JSON.parse(raw);
             if (Array.isArray(parsed)) {
-                const known = new Set(getKnownClientCoinSymbols());
+                const known = new Set(getKnownClientHoldingSymbols());
                 const normalized = parsed
                     .filter((h) => h && known.has(h.symbol))
                     .map((h) => {
@@ -1538,7 +2345,7 @@ function getClientPortfolioHoldings() {
     } catch (e) {
         // ignore
     }
-    const known = new Set(getKnownClientCoinSymbols());
+    const known = new Set(getKnownClientHoldingSymbols());
     const seeded = CLIENT_DEMO_HOLDINGS.filter((h) => known.has(h.symbol)).map((h) => {
         const priceNow = Number(h.currentPrice || 0);
         const change = Number(h.change24h || 0);
@@ -1554,93 +2361,291 @@ function setClientPortfolioHoldings(holdings) {
     localStorage.setItem(CLIENT_PORTFOLIO_HOLDINGS_KEY, JSON.stringify(holdings || []));
 }
 
-function getClientBotState() {
-    try {
-        const raw = localStorage.getItem(CLIENT_BOTS_KEY);
-        if (raw) {
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed)) return normalizeBots(parsed);
-        }
-    } catch (e) {
-        // ignore
-    }
-    const empty = [];
-    localStorage.setItem(CLIENT_BOTS_KEY, JSON.stringify(empty));
-    return empty;
-}
+// ===== INVESTOR PORTAL (Phase 2 — dashboard, documents, FAQ assistant) =====
+const INVESTOR_PERFORMANCE_TREND = [0.92, 0.94, 0.91, 0.97, 1.02, 1.06];
+const INVESTOR_DOCUMENTS = [
+    { id: 'stmt-mar-2026', title: 'Monthly Statement — March 2026', type: 'Statement', date: '2026-03-31', size: '245 KB', file: 'statement-mar-2026.pdf' },
+    { id: 'perf-q4-2025', title: 'Q4 2025 Performance Report', type: 'Performance', date: '2026-01-15', size: '1.2 MB', file: 'performance-q4-2025.pdf' },
+    { id: 'tax-2025', title: 'Tax Summary — FY 2025', type: 'Tax', date: '2026-02-01', size: '380 KB', file: 'tax-summary-2025.pdf' },
+    { id: 'kyc-letter', title: 'KYC Verification Letter', type: 'Compliance', date: '2025-11-08', size: '120 KB', file: 'kyc-verification.pdf' },
+    { id: 'alloc-memo', title: 'Allocation Strategy Memo', type: 'Strategy', date: '2026-02-20', size: '540 KB', file: 'allocation-memo.pdf' },
+];
 
-function setClientBotState(bots) {
-    localStorage.setItem(CLIENT_BOTS_KEY, JSON.stringify(bots || []));
-}
+const INVESTOR_STATIC_UPDATES = [
+    { time: '2 hours ago', title: 'Q1 report published', body: 'Your Q1 2026 performance summary is now available in Documents.', icon: '📊' },
+    { time: 'Yesterday', title: 'New allocation posted', body: 'Target weights updated for RGCIS Growth Fund II.', icon: '📈' },
+    { time: '3 days ago', title: 'Connector sync completed', body: 'Plaid custodian balances refreshed for your linked accounts.', icon: '🔌' },
+];
 
-function normalizeBots(bots) {
-    const cleaned = (bots || []).filter(Boolean).map((b) => {
-        const id = b.id || generateId('bot');
-        const createdAt = b.createdAt || new Date().toISOString();
-        const status = b.status || b.state || 'draft';
-        const state = ['draft', 'running', 'paused', 'stopped'].includes(status) ? status : 'stopped';
-
+function getInvestorPortfolioSnapshot() {
+    const watched = new Set(getWatchedHoldings());
+    const holdings = getClientPortfolioHoldings().map((h) => {
+        const value = Number(h.qty || 0) * Number(h.currentPrice || 0);
+        const meta = CLIENT_HOLDING_LIBRARY.find((c) => c.symbol === h.symbol);
         return {
-            id,
-            name: String(b.name || 'Bot'),
-            // USDC is treated as cash; exclude it from tradable assets.
-            assets: Array.isArray(b.assets) ? b.assets.filter((s) => String(s) !== 'USDC') : [],
-            mode: b.mode || 'both',
-            strategy: b.strategy || 'both',
-            intensity: b.intensity || 'medium',
-            tradeSizeMode: b.tradeSizeMode || 'fixed_usd',
-            tradeSizeValue: Number(b.tradeSizeValue || 500),
-            intervalMs: Number(b.intervalMs || (b.intensity === 'high' ? 5000 : b.intensity === 'low' ? 30000 : 10000)),
-            minUsdc: Number(b.minUsdc ?? 250),
-            maxExposurePct: Number(b.maxExposurePct ?? 45),
-            state,
-            createdAt,
-            lastEventAt: b.lastEventAt || null,
-            stats: b.stats && typeof b.stats === 'object'
-                ? b.stats
-                : { trades: 0, realizedPnlUsd: 0, wins: 0, losses: 0 },
-            positions: b.positions && typeof b.positions === 'object' ? b.positions : {}, // symbol -> { qty, avgCost }
+            ...h,
+            value,
+            color: meta?.color || '#8be8f6',
+            name: meta?.name || h.symbol,
+            assetClass: meta?.assetClass || 'Other',
+            watched: watched.has(h.symbol),
         };
     });
-
-    // Persist normalized state so it stays consistent.
-    setClientBotState(cleaned);
-    return cleaned;
+    const totalValue = holdings.reduce((s, h) => s + h.value, 0);
+    const cash = holdings.find((h) => h.symbol === 'CASH')?.value || 0;
+    const invested = Math.max(0, totalValue - cash);
+    const costBasis = holdings.reduce((s, h) => s + Number(h.qty || 0) * Number(h.avgPrice || 0), 0);
+    const unrealizedPnl = totalValue - costBasis;
+    const unrealizedPct = costBasis > 0 ? (unrealizedPnl / costBasis) * 100 : 0;
+    const allocation = holdings
+        .filter((h) => h.value > 0 && h.watched)
+        .sort((a, b) => b.value - a.value)
+        .map((h) => ({
+            ...h,
+            pct: totalValue > 0 ? (h.value / totalValue) * 100 : 0,
+        }));
+    return { holdings, totalValue, cash, invested, unrealizedPnl, unrealizedPct, allocation };
 }
 
-function getClientBotEvents() {
-    try {
-        const raw = localStorage.getItem(CLIENT_BOT_EVENTS_KEY);
-        if (raw) {
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed)) return parsed;
+function renderInvestorDashboard() {
+    const kpiEl = document.getElementById('investor-dashboard-kpis');
+    const allocEl = document.getElementById('investor-allocation-chart');
+    const perfEl = document.getElementById('investor-performance-chart');
+    const feedEl = document.getElementById('investor-updates-feed');
+    if (!kpiEl || !allocEl || !perfEl || !feedEl) return;
+
+    const snap = getInvestorPortfolioSnapshot();
+    const mtdReturn = 2.4 + (snap.unrealizedPct * 0.05);
+    const ytdReturn = 8.6 + (snap.unrealizedPct * 0.08);
+
+    kpiEl.innerHTML = `
+        <div class="portfolio-summary-item investor-kpi-card">
+            <div class="portfolio-summary-label">Total Portfolio Value</div>
+            <div class="portfolio-summary-value">${formatUSD(snap.totalValue)}</div>
+        </div>
+        <div class="portfolio-summary-item investor-kpi-card">
+            <div class="portfolio-summary-label">MTD Return (demo)</div>
+            <div class="portfolio-summary-value investor-kpi-pos">+${mtdReturn.toFixed(1)}%</div>
+        </div>
+        <div class="portfolio-summary-item investor-kpi-card">
+            <div class="portfolio-summary-label">YTD Return (demo)</div>
+            <div class="portfolio-summary-value investor-kpi-pos">+${ytdReturn.toFixed(1)}%</div>
+        </div>
+        <div class="portfolio-summary-item investor-kpi-card">
+            <div class="portfolio-summary-label">Cash & Equivalents</div>
+            <div class="portfolio-summary-value">${formatUSD(snap.cash)}</div>
+        </div>
+    `;
+
+    allocEl.innerHTML = snap.allocation.map((h) => `
+        <div class="investor-alloc-row">
+            <div class="investor-alloc-label">
+                <span class="coin-dot" style="background:${h.color}"></span>
+                <span>${h.symbol} <span class="investor-alloc-pct">${h.assetClass}</span></span>
+                <span class="investor-alloc-pct">${h.pct.toFixed(1)}%</span>
+            </div>
+            <div class="investor-alloc-bar-wrap">
+                <div class="investor-alloc-bar" style="width:${Math.max(h.pct, 2)}%; background:${h.color}"></div>
+            </div>
+            <div class="investor-alloc-value">${formatUSD(h.value)}</div>
+        </div>
+    `).join('') || '<p class="portfolio-note">No holdings to display.</p>';
+
+    const maxTrend = Math.max(...INVESTOR_PERFORMANCE_TREND);
+    perfEl.innerHTML = `
+        <div class="investor-perf-bars">
+            ${INVESTOR_PERFORMANCE_TREND.map((factor, i) => {
+                const height = Math.round((factor / maxTrend) * 100);
+                const labels = ['Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
+                const val = snap.totalValue * factor;
+                return `
+                    <div class="investor-perf-col" title="${labels[i]}: ${formatUSD(val)}">
+                        <div class="investor-perf-bar" style="height:${height}%"></div>
+                        <span class="investor-perf-label">${labels[i]}</span>
+                    </div>
+                `;
+            }).join('')}
+        </div>
+        <div class="investor-perf-footer">
+            <span>Unrealized P/L: <strong class="${snap.unrealizedPnl >= 0 ? 'investor-kpi-pos' : 'investor-kpi-neg'}">${formatSignedUSD(snap.unrealizedPnl)}</strong></span>
+            <span>Positions: <strong>${snap.holdings.length}</strong></span>
+        </div>
+    `;
+
+    const updates = INVESTOR_STATIC_UPDATES.slice(0, 5);
+
+    feedEl.innerHTML = updates.map((u) => `
+        <div class="investor-update-item">
+            <div class="investor-update-icon" aria-hidden="true">${u.icon}</div>
+            <div class="investor-update-body">
+                <div class="investor-update-head">
+                    <strong>${escapeHtml(u.title)}</strong>
+                    <span class="investor-update-time">${escapeHtml(u.time)}</span>
+                </div>
+                <p>${escapeHtml(u.body)}</p>
+            </div>
+        </div>
+    `).join('');
+}
+
+function renderDocuments() {
+    const listEl = document.getElementById('investor-documents-list');
+    if (!listEl) return;
+
+    listEl.innerHTML = INVESTOR_DOCUMENTS.map((doc) => `
+        <div class="investor-doc-card">
+            <div class="investor-doc-icon" aria-hidden="true">${getDocumentIcon(doc.type)}</div>
+            <div class="investor-doc-meta">
+                <div class="investor-doc-title">${escapeHtml(doc.title)}</div>
+                <div class="investor-doc-sub">
+                    <span class="investor-doc-type">${escapeHtml(doc.type)}</span>
+                    <span>${escapeHtml(doc.date)}</span>
+                    <span>${escapeHtml(doc.size)}</span>
+                </div>
+            </div>
+            <div class="investor-doc-actions">
+                <button type="button" class="btn-secondary" onclick="previewInvestorDocument('${doc.id}')">Preview</button>
+                <button type="button" class="btn-primary" onclick="downloadInvestorDocument('${doc.id}')">Download</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function getDocumentIcon(type) {
+    const icons = { Statement: '📄', Performance: '📊', Tax: '🧾', Compliance: '✅', Strategy: '📋' };
+    return icons[type] || '📁';
+}
+
+function findInvestorDocument(id) {
+    return INVESTOR_DOCUMENTS.find((d) => d.id === id);
+}
+
+function previewInvestorDocument(id) {
+    const doc = findInvestorDocument(id);
+    if (!doc) return;
+    alert(`Demo preview: ${doc.title}\n\nThis is a mock document for the investor portal demo. No file is stored on the server.`);
+}
+
+function downloadInvestorDocument(id) {
+    const doc = findInvestorDocument(id);
+    if (!doc) return;
+    const blob = new Blob(
+        [`Investor Intelligence Platform — Demo Document\n\n${doc.title}\nGenerated: ${doc.date}\n\nThis is placeholder content for demo purposes only.`],
+        { type: 'text/plain' }
+    );
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = doc.file.replace(/\.pdf$/i, '.txt');
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+let isInvestorChatInitialized = false;
+
+function setupInvestorChatInterface() {
+    if (isInvestorChatInitialized) return;
+    const input = document.getElementById('investor-chat-input');
+    const sendBtn = document.getElementById('investor-chat-send-btn');
+    if (!input || !sendBtn) return;
+
+    const send = () => {
+        const message = input.value.trim();
+        if (!message) return;
+        sendInvestorChatMessage(message);
+        input.value = '';
+        input.focus();
+    };
+
+    sendBtn.addEventListener('click', send);
+    input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            send();
         }
-    } catch (e) {
-        // ignore
+    });
+    isInvestorChatInitialized = true;
+}
+
+function renderInvestorChat() {
+    document.getElementById('investor-chat-input')?.focus();
+}
+
+function sendInvestorChatSuggestion(text) {
+    sendInvestorChatMessage(text);
+}
+
+function sendInvestorChatMessage(userQuery) {
+    const container = document.getElementById('investor-chat-messages');
+    if (!container) return;
+
+    container.appendChild(createChatMessage('user', userQuery));
+    container.scrollTop = container.scrollHeight;
+
+    const typing = createChatMessage('bot', '...', true);
+    container.appendChild(typing);
+    container.scrollTop = container.scrollHeight;
+
+    setTimeout(() => {
+        typing.remove();
+        const reply = answerInvestorFaq(userQuery);
+        const html = `<div>${formatInvestorChatReply(reply)}</div>`;
+        container.appendChild(createChatMessage('bot', html));
+        container.scrollTop = container.scrollHeight;
+    }, 350 + Math.random() * 250);
+}
+
+function formatInvestorChatReply(text) {
+    return escapeHtml(String(text || ''))
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\n/g, '<br>');
+}
+
+function answerInvestorFaq(query) {
+    const q = String(query).toLowerCase().replace(/\s+/g, ' ').trim();
+    const snap = getInvestorPortfolioSnapshot();
+
+    if (/^(hi|hello|hey|greetings)\b/.test(q)) {
+        return `Hello — I can help with your portfolio demo. You currently hold about ${formatUSD(snap.totalValue)} across ${snap.holdings.length} positions. Ask about allocation, returns, documents, or connected accounts.`;
     }
-    const empty = [];
-    localStorage.setItem(CLIENT_BOT_EVENTS_KEY, JSON.stringify(empty));
-    return empty;
-}
-
-function setClientBotEvents(events) {
-    localStorage.setItem(CLIENT_BOT_EVENTS_KEY, JSON.stringify(events || []));
-}
-
-function generateId(prefix) {
-    return `${prefix}_${Date.now()}_${String(Math.random()).slice(2, 8)}`;
-}
-
-function formatUSD(n) {
-    const num = Number(n || 0);
-    return `$${num.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
-}
-
-function formatSignedUSD(n) {
-    const num = Number(n || 0);
-    const abs = Math.abs(num);
-    const sign = num < 0 ? '-' : '';
-    return `${sign}$${abs.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+    if (/help|what can you do|capabilities/.test(q)) {
+        return 'I can answer demo questions about:\n• Portfolio value and allocation\n• Performance and returns\n• Available documents and reports\n• Connected custodian accounts\n\nTry a quick-ask chip below or type your own question.';
+    }
+    if (/portfolio|total value|net worth|how much/.test(q)) {
+        return `Your total portfolio value is **${formatUSD(snap.totalValue)}** (demo). Cash & equivalents: ${formatUSD(snap.cash)}. Invested assets: ${formatUSD(snap.invested)}. Unrealized P/L: ${formatSignedUSD(snap.unrealizedPnl)} (${snap.unrealizedPct >= 0 ? '+' : ''}${snap.unrealizedPct.toFixed(1)}%).`;
+    }
+    if (/allocat|exposure|breakdown|split|weight/.test(q)) {
+        if (!snap.allocation.length) return 'No allocation data available yet — try Reset Demo to restore seed holdings.';
+        const lines = snap.allocation.slice(0, 6).map((h) => `• **${h.symbol}**: ${h.pct.toFixed(1)}% (${formatUSD(h.value)})`);
+        return `Here's your current allocation:\n${lines.join('\n')}`;
+    }
+    if (/return|performance|ytd|mtd|gain|profit/.test(q)) {
+        const mtd = (2.4 + snap.unrealizedPct * 0.05).toFixed(1);
+        const ytd = (8.6 + snap.unrealizedPct * 0.08).toFixed(1);
+        return `Demo performance snapshot:\n• MTD return: **+${mtd}%**\n• YTD return: **+${ytd}%**\n• Unrealized P/L: **${formatSignedUSD(snap.unrealizedPnl)}**\n\nSee the Dashboard tab for the 6-month performance chart.`;
+    }
+    if (/document|report|statement|download|pdf/.test(q)) {
+        const names = INVESTOR_DOCUMENTS.slice(0, 3).map((d) => `• ${d.title}`).join('\n');
+        return `You have **${INVESTOR_DOCUMENTS.length}** documents available (demo):\n${names}\n\nOpen the **Documents** tab to preview or download mock files.`;
+    }
+    if (/integrat|connect|sync|plaid|docusign|salesforce/.test(q)) {
+        const state = getClientConnectorState();
+        const connected = Object.values(state).filter((c) => c && c.connected).length;
+        return `**${connected}** of ${CLIENT_CONNECTORS.length} connectors are connected (demo UI only). Open **Connected Accounts** to link Plaid, DocuSign, or Salesforce and run a mock sync.`;
+    }
+    if (/rgcf|growth fund|rgcis fund/.test(q)) {
+        const rg = snap.holdings.find((h) => h.symbol === PORTFOLIO_PLATFORM_HOLDING);
+        return rg
+            ? `**${PORTFOLIO_PLATFORM_HOLDING}** (RGCIS Growth Fund II) is valued at **${formatUSD(rg.value)}** in your portfolio. It is always highlighted on your dashboard.`
+            : `**${PORTFOLIO_PLATFORM_HOLDING}** is the flagship private fund in this demo. Check Portfolio for holdings.`;
+    }
+    if (/cash|liquidity/.test(q)) {
+        return `Your cash & equivalents balance is **${formatUSD(snap.cash)}** — available for capital calls and distributions in the demo narrative.`;
+    }
+    if (/thank/.test(q)) {
+        return "You're welcome — happy to help with your investor portal demo.";
+    }
+    return `I didn't quite match that to a demo topic. Try asking about portfolio value, allocation, returns, documents, or integrations. For example: "What's my allocation?"`;
 }
 
 function renderPortfolio() {
@@ -1651,19 +2656,18 @@ function renderPortfolio() {
 
     if (!holdingsTbody || !trackList || !summaryEl) return;
 
-    const trackedCoins = getTrackedCoins();
-    const trackedSet = new Set(trackedCoins);
+    const watched = getWatchedHoldings();
+    const watchedSet = new Set(watched);
 
     const holdingsState = getClientPortfolioHoldings();
     const holdings = holdingsState.map((h) => {
         const value = h.qty * h.currentPrice;
-        const tracked = trackedSet.has(h.symbol);
-        return { ...h, value, tracked };
+        const meta = CLIENT_HOLDING_LIBRARY.find((c) => c.symbol === h.symbol);
+        return { ...h, value, watched: watchedSet.has(h.symbol), assetClass: meta?.assetClass || '—', color: meta?.color };
     }).sort((a, b) => b.value - a.value);
 
     const totalValue = holdings.reduce((s, h) => s + h.value, 0);
-    const trackedValue = holdings.filter((h) => h.tracked).reduce((s, h) => s + h.value, 0);
-    const trackedCount = trackedCoins.length;
+    const watchedValue = holdings.filter((h) => h.watched).reduce((s, h) => s + h.value, 0);
 
     summaryEl.innerHTML = `
         <div class="portfolio-summary-grid">
@@ -1672,33 +2676,29 @@ function renderPortfolio() {
                 <div class="portfolio-summary-value">${formatUSD(totalValue)}</div>
             </div>
             <div class="portfolio-summary-item">
-                <div class="portfolio-summary-label">Tracked Value</div>
-                <div class="portfolio-summary-value">${formatUSD(trackedValue)}</div>
+                <div class="portfolio-summary-label">Dashboard Highlights</div>
+                <div class="portfolio-summary-value">${formatUSD(watchedValue)}</div>
             </div>
             <div class="portfolio-summary-item">
-                <div class="portfolio-summary-label">Coins Tracked</div>
-                <div class="portfolio-summary-value">${trackedCount}</div>
+                <div class="portfolio-summary-label">Positions</div>
+                <div class="portfolio-summary-value">${holdings.length}</div>
             </div>
         </div>
     `;
 
     holdingsTbody.innerHTML = holdings.map((h) => {
-        const coin = CLIENT_COIN_LIBRARY.find((c) => c.symbol === h.symbol);
-        const badge = h.tracked
-            ? `<span class="coin-pill coin-pill--tracked" style="border-color:${coin?.color || '#14f195'};">Tracked</span>`
-            : `<span class="coin-pill coin-pill--nottracked">Watch</span>`;
         const changeClass = h.change24h > 0 ? 'pos' : h.change24h < 0 ? 'neg' : 'flat';
         const changeText = `${h.change24h > 0 ? '+' : ''}${h.change24h.toFixed(2)}%`;
         return `
             <tr>
                 <td>
                     <div class="portfolio-coin-cell">
-                        <span class="coin-dot" style="background:${coin?.color || '#8be8f6'}"></span>
+                        <span class="coin-dot" style="background:${h.color || '#8be8f6'}"></span>
                         <span class="portfolio-coin-symbol">${h.symbol}</span>
-                        ${badge}
                     </div>
                 </td>
-                <td>${typeof h.qty === 'number' ? h.qty.toLocaleString(undefined, { maximumFractionDigits: 6 }) : h.qty}</td>
+                <td>${escapeHtml(h.assetClass)}</td>
+                <td>${typeof h.qty === 'number' ? h.qty.toLocaleString(undefined, { maximumFractionDigits: 2 }) : h.qty}</td>
                 <td>${formatUSD(h.currentPrice)}</td>
                 <td><strong>${formatUSD(h.value)}</strong></td>
                 <td class="portfolio-change ${changeClass}">${changeText}</td>
@@ -1707,939 +2707,40 @@ function renderPortfolio() {
     }).join('');
 
     if (tipsEl) {
-        tipsEl.innerHTML = `<p class="portfolio-note">Platform coin <strong>${PORTFOLIO_PLATFORM_COIN}</strong> is always tracked. Toggle others to change what you highlight in the dashboard.</p>`;
+        tipsEl.innerHTML = `<p class="portfolio-note"><strong>${PORTFOLIO_PLATFORM_HOLDING}</strong> is always shown on your dashboard. Toggle other positions to include them in the allocation chart.</p>`;
     }
 
-    trackList.innerHTML = CLIENT_COIN_LIBRARY.map((coin) => {
-        const isPlatform = coin.symbol === PORTFOLIO_PLATFORM_COIN;
-        const checked = trackedSet.has(coin.symbol);
+    trackList.innerHTML = CLIENT_HOLDING_LIBRARY.map((pos) => {
+        const isPlatform = pos.symbol === PORTFOLIO_PLATFORM_HOLDING;
+        const checked = watchedSet.has(pos.symbol);
         return `
             <label class="portfolio-coin-track">
                 <input
                     type="checkbox"
                     ${checked ? 'checked' : ''}
                     ${isPlatform ? 'disabled' : ''}
-                    onchange="onPortfolioTrackToggle('${coin.symbol}', this.checked)"
+                    onchange="onPortfolioWatchToggle('${pos.symbol}', this.checked)"
                 />
                 <span class="portfolio-coin-track-label">
-                    <span class="coin-dot" style="background:${coin.color};"></span>
-                    ${coin.symbol} <span class="portfolio-coin-track-name">(${coin.name})</span>
+                    <span class="coin-dot" style="background:${pos.color};"></span>
+                    ${pos.symbol} <span class="portfolio-coin-track-name">(${pos.name})</span>
                 </span>
             </label>
         `;
     }).join('');
 
-    // Keep bot form in sync with tracked coins.
-    renderBotAssetsSelector(trackedCoins);
-    renderBotsUI();
-    renderBotActivityUI();
-    restoreRunningBotsFromStorage();
     renderConnectorsDemo();
-
-    if (!clientBotUiBound) {
-        clientBotUiBound = true;
-        document.getElementById('bot-create-btn')?.addEventListener('click', () => createClientBotFromForm());
-        document.getElementById('bot-simulate-one-btn')?.addEventListener('click', () => simulateBotOneCyclePreview());
-        document.getElementById('bot-cancel-edit-btn')?.addEventListener('click', () => cancelBotEdit());
-    }
 }
 
-function onPortfolioTrackToggle(symbol, checked) {
-    const tracked = getTrackedCoins();
-    const set = new Set(tracked);
-    if (symbol === PORTFOLIO_PLATFORM_COIN) return; // always tracked
+function onPortfolioWatchToggle(symbol, checked) {
+    const watched = getWatchedHoldings();
+    const set = new Set(watched);
+    if (symbol === PORTFOLIO_PLATFORM_HOLDING) return;
     if (checked) set.add(symbol);
     else set.delete(symbol);
-    setTrackedCoins(Array.from(set));
+    setWatchedHoldings(Array.from(set));
     renderPortfolio();
-}
-
-function getBotFormAssetsSelection() {
-    const raw = localStorage.getItem(CLIENT_BOT_FORM_ASSETS_KEY);
-    if (!raw) return [];
-    try {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed.map((x) => String(x)).filter(Boolean);
-    } catch (e) {
-        // ignore
-    }
-    return [];
-}
-
-function setBotFormAssetsSelection(coins) {
-    localStorage.setItem(CLIENT_BOT_FORM_ASSETS_KEY, JSON.stringify(coins || []));
-}
-
-function onBotAssetToggle(symbol, checked) {
-    const selected = new Set(getBotFormAssetsSelection());
-    if (checked) selected.add(String(symbol));
-    else selected.delete(String(symbol));
-    setBotFormAssetsSelection(Array.from(selected));
-}
-
-function renderBotAssetsSelector(trackedCoins) {
-    const container = document.getElementById('bot-assets-select');
-    if (!container) return;
-
-    // USDC is treated as cash; hide it from tradable assets.
-    const coins = Array.from(new Set((trackedCoins || []).map((c) => String(c)).filter(Boolean))).filter((c) => c !== 'USDC');
-    const stored = new Set(getBotFormAssetsSelection());
-    // Default: select all tracked coins when nothing stored yet.
-    if (stored.size === 0) coins.forEach((c) => stored.add(c));
-
-    container.innerHTML = coins
-        .sort((a, b) => (a === PORTFOLIO_PLATFORM_COIN ? -1 : 1) - (b === PORTFOLIO_PLATFORM_COIN ? -1 : 1))
-        .map((symbol) => {
-            const coin = CLIENT_COIN_LIBRARY.find((c) => c.symbol === symbol);
-            const checked = stored.has(symbol);
-            return `
-                <label class="portfolio-coin-track">
-                    <input
-                        type="checkbox"
-                        ${checked ? 'checked' : ''}
-                        onchange="onBotAssetToggle('${symbol}', this.checked)"
-                    />
-                    <span class="portfolio-coin-track-label">
-                        <span class="coin-dot" style="background:${coin?.color || '#8be8f6'}"></span>
-                        ${symbol} <span class="portfolio-coin-track-name">(${coin?.name || 'Asset'})</span>
-                    </span>
-                </label>
-            `;
-        })
-        .join('');
-
-    setBotFormAssetsSelection(coins.filter((c) => stored.has(c)));
-}
-
-function getClientHoldingsBySymbol(holdings, symbol) {
-    return holdings.find((h) => h.symbol === symbol);
-}
-
-function intensityToIntervalMs(intensity) {
-    if (intensity === 'low') return 5000;
-    if (intensity === 'high') return 1500;
-    return 2500; // medium
-}
-
-function intensityToUsd(intensity) {
-    if (intensity === 'low') return 250;
-    if (intensity === 'high') return 1000;
-    return 500; // medium
-}
-
-function intensityToVolMultiplier(intensity) {
-    if (intensity === 'low') return 0.75;
-    if (intensity === 'high') return 1.45;
-    return 1; // medium
-}
-
-const PRICE_VOL_BY_SYMBOL = {
-    // Volatility per bot tick (demo-only; not real time units).
-    RGCIS: 0.025,
-    BTC: 0.0045,
-    ETH: 0.008,
-    SOL: 0.018,
-    USDC: 0.00025,
-    LINK: 0.014
-};
-
-function clampPrice(n, min, max) {
-    return Math.min(max, Math.max(min, n));
-}
-
-function randn() {
-    // Box–Muller transform (approx normal distribution).
-    let u = 0;
-    let v = 0;
-    while (u === 0) u = Math.random();
-    while (v === 0) v = Math.random();
-    return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
-}
-
-function simulateMarketPrices(holdings, symbolsToUpdate, intensity) {
-    const set = new Set(symbolsToUpdate || []);
-    const volMult = intensityToVolMultiplier(intensity);
-
-    holdings.forEach((h) => {
-        if (!set.has(h.symbol)) return;
-
-        const priceNow = Number(h.currentPrice || 0);
-        if (!priceNow || priceNow <= 0) return;
-
-        // Baseline price used to recompute "24h change".
-        if (h.price24hAgo === undefined || h.price24hAgo === null) {
-            h.price24hAgo = priceNow;
-        }
-
-        const baseVol = PRICE_VOL_BY_SYMBOL[h.symbol] ?? 0.01;
-        const vol = baseVol * volMult;
-
-        // Small drift + random shock.
-        const drift = (Math.random() - 0.5) * vol * 0.35;
-        const shock = randn() * vol * 0.75;
-        let newPrice = priceNow * (1 + drift + shock);
-
-        if (h.symbol === 'USDC') {
-            newPrice = clampPrice(newPrice, 0.993, 1.007);
-        } else {
-            newPrice = Math.max(newPrice, priceNow * 0.7); // avoid extreme drops in demo
-            newPrice = Math.min(newPrice, priceNow * 1.45); // avoid extreme pumps in demo
-        }
-
-        h.currentPrice = newPrice;
-        const baseline = Number(h.price24hAgo || priceNow);
-        const changePct = baseline ? ((newPrice / baseline) - 1) * 100 : 0;
-        h.change24h = Number.isFinite(changePct) ? changePct : 0;
-    });
-
-    return holdings;
-}
-
-function chooseAction(bot, holding) {
-    const mode = bot.mode;
-    if (mode === 'buy') return 'buy';
-    if (mode === 'sell') return 'sell';
-
-    // DCA: consistent buy-side accumulation (demo expectation).
-    if (bot.strategy === 'dca') return 'buy';
-
-    // "Both" strategy means Threshold or DCA (demo-only).
-    const effectiveStrategy = bot.strategy === 'both'
-        ? (Math.random() < 0.5 ? 'threshold' : 'dca')
-        : bot.strategy;
-
-    if (effectiveStrategy === 'threshold') {
-        // Threshold-like behavior: follow the demo 24h direction.
-        return (holding?.change24h || 0) >= 0 ? 'buy' : 'sell';
-    }
-
-    if (effectiveStrategy === 'dca') {
-        return 'buy';
-    }
-
-    // Optional momentum strategy (kept for demo flexibility).
-    if (effectiveStrategy === 'momentum') {
-        return (holding?.change24h || 0) >= 0 ? 'buy' : 'sell';
-    }
-
-    return Math.random() < 0.5 ? 'buy' : 'sell';
-}
-
-function buildReason(bot, action, symbol, holding) {
-    const ch = Number(holding?.change24h || 0);
-    const chText = `${ch >= 0 ? '+' : ''}${ch.toFixed(2)}%`;
-    const strategy = bot.strategy || 'both';
-    if (strategy === 'threshold') {
-        return `${action.toUpperCase()} ${symbol} — Threshold (${chText})`;
-    }
-    if (strategy === 'dca') {
-        return `${action.toUpperCase()} ${symbol} — DCA scheduled buy`;
-    }
-    if (strategy === 'momentum') {
-        return `${action.toUpperCase()} ${symbol} — Momentum bias (${chText})`;
-    }
-    return `${action.toUpperCase()} ${symbol} — Mixed strategy (${chText})`;
-}
-
-function appendClientBotEvent(event) {
-    const events = getClientBotEvents();
-    events.push(event);
-    // Keep last 200 events.
-    const trimmed = events.slice(Math.max(0, events.length - 200));
-    setClientBotEvents(trimmed);
-}
-
-function renderBotsUI() {
-    const mount = document.getElementById('portfolio-bots-list');
-    if (!mount) return;
-    const bots = getClientBotState();
-
-    if (bots.length === 0) {
-        mount.innerHTML = `
-            <div class="empty-state" style="padding: 1rem;">
-                <div class="empty-state-icon">🤖</div>
-                No bots created yet.
-            </div>
-        `;
-        return;
-    }
-
-    mount.innerHTML = bots
-        .slice()
-        .sort((a, b) => (b.lastEventAt || b.createdAt).localeCompare(a.lastEventAt || a.createdAt))
-        .map((bot) => {
-            const expanded = !!clientBotExpandedPanels[bot.id];
-            const assetsCount = Array.isArray(bot.assets) ? bot.assets.length : 0;
-            const state = bot.state || bot.status || 'stopped';
-            const statusPill = state === 'running'
-                ? '<span class="portfolio-bot-pill portfolio-bot-pill--running">Running</span>'
-                : state === 'paused'
-                    ? '<span class="portfolio-bot-pill portfolio-bot-pill--stopped">Paused</span>'
-                    : state === 'draft'
-                        ? '<span class="portfolio-bot-pill portfolio-bot-pill--stopped">Draft</span>'
-                        : '<span class="portfolio-bot-pill portfolio-bot-pill--stopped">Stopped</span>';
-            const modeLabel = bot.mode === 'both' ? 'Buy/Sell' : bot.mode.charAt(0).toUpperCase() + bot.mode.slice(1);
-            const strategyLabel = bot.strategy === 'both'
-                ? 'Both (Threshold / DCA)'
-                : bot.strategy === 'dca'
-                    ? 'DCA'
-                    : bot.strategy === 'threshold'
-                        ? 'Threshold'
-                        : bot.strategy.charAt(0).toUpperCase() + bot.strategy.slice(1);
-            const intensityLabel = bot.intensity ? bot.intensity.charAt(0).toUpperCase() + bot.intensity.slice(1) : 'Medium';
-            const last = bot.lastEventAt ? new Date(bot.lastEventAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
-            const trades = Number(bot.stats?.trades || 0);
-            const pnl = Number(bot.stats?.realizedPnlUsd || 0);
-            return `
-                <div class="portfolio-bot-card">
-                    <h5>${escapeHtml(bot.name || 'Bot')} ${statusPill}</h5>
-                    <div class="portfolio-bot-meta">
-                        Mode: <strong>${escapeHtml(modeLabel)}</strong> · Strategy: <strong>${escapeHtml(strategyLabel)}</strong> · Intensity: <strong>${escapeHtml(intensityLabel)}</strong>
-                        <div style="margin-top: 0.35rem; color: var(--text-secondary);">
-                            Assets: <strong>${assetsCount}</strong> · Trades: <strong>${trades}</strong> · Realized P/L: <strong>${formatSignedUSD(pnl)}</strong> · Last: <strong>${escapeHtml(String(last))}</strong>
-                        </div>
-                    </div>
-                    <div class="portfolio-bot-actions">
-                        ${
-                            state === 'running'
-                                ? `<button type="button" class="btn-secondary" onclick="pauseClientBot('${bot.id}')">Pause</button>
-                                   <button type="button" class="btn-secondary" onclick="stopClientBot('${bot.id}')">Stop</button>`
-                                : `<button type="button" class="btn-primary" onclick="startClientBot('${bot.id}')">Start</button>`
-                        }
-                        <button type="button" class="btn-secondary" onclick="toggleClientBotActivityPanel('${bot.id}')">
-                            ${expanded ? 'Hide' : 'Open'} Activity
-                        </button>
-                        <button type="button" class="btn-secondary" onclick="beginEditClientBot('${bot.id}')">Edit</button>
-                        <button type="button" class="btn-secondary" onclick="cloneClientBot('${bot.id}')">Clone</button>
-                        <button type="button" class="btn-danger" onclick="deleteClientBot('${bot.id}')">Delete</button>
-                    </div>
-
-                    <div class="portfolio-bot-panel-activity" id="portfolio-bot-activity-panel-${bot.id}" style="display:${expanded ? 'block' : 'none'};">
-                        ${expanded ? renderClientBotActivityItems(getClientBotEventsForBot(bot.id)) : ''}
-                    </div>
-                </div>
-            `;
-        })
-        .join('');
-}
-
-function renderBotActivityUI() {
-    const mount = document.getElementById('portfolio-bot-activity');
-    if (!mount) return;
-    const events = getClientBotEvents();
-    if (!events.length) {
-        mount.innerHTML = `
-            <div class="portfolio-bot-activity-item">
-                No bot activity yet. Start a bot or click “Simulate One Cycle”.
-            </div>
-        `;
-        return;
-    }
-
-    const recent = events.slice().reverse().slice(0, 12);
-    mount.innerHTML = recent.map((e) => {
-        const sign = e.qtyDelta > 0 ? '+' : '';
-        const type = e.type ? String(e.type).toUpperCase() : 'TRADE';
-        return `
-            <div class="portfolio-bot-activity-item">
-                <div class="portfolio-bot-activity-top">
-                    <div><span class="portfolio-bot-activity-type">${escapeHtml(type)}</span> · <strong>${escapeHtml(e.symbol)}</strong></div>
-                    <div style="color: var(--text-secondary); font-size: 0.85rem;">${escapeHtml(
-                        new Date(e.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                    )}</div>
-                </div>
-                <div style="color: var(--text-secondary); font-size: 0.85rem; line-height: 1.4;">
-                    Bot: <strong>${escapeHtml(e.botName)}</strong><br/>
-                    Qty Δ: <strong>${sign}${Number(e.qtyDelta).toLocaleString(undefined, { maximumFractionDigits: 6 })}</strong> @ ${formatUSD(e.price)}<br/>
-                    USD impact: <strong>${formatSignedUSD(e.usdValue)}</strong><br/>
-                    ${e.reason ? `Reason: ${escapeHtml(e.reason)}` : ''}
-                </div>
-            </div>
-        `;
-    }).join('');
-}
-
-function getClientBotEventsForBot(botId, limit = 8) {
-    const events = getClientBotEvents().filter((e) => e.botId === botId);
-    // Show newest first.
-    return events.slice().reverse().slice(0, limit);
-}
-
-function renderClientBotActivityItems(events) {
-    if (!events || events.length === 0) {
-        return `
-            <div class="portfolio-bot-activity-item">
-                No bot activity yet.
-            </div>
-        `;
-    }
-
-    return events.map((e) => {
-        const sign = e.qtyDelta > 0 ? '+' : '';
-        const type = e.type ? String(e.type).toUpperCase() : 'TRADE';
-        return `
-            <div class="portfolio-bot-activity-item">
-                <div class="portfolio-bot-activity-top">
-                    <div><span class="portfolio-bot-activity-type">${escapeHtml(type)}</span> · <strong>${escapeHtml(e.symbol)}</strong></div>
-                    <div style="color: var(--text-secondary); font-size: 0.85rem;">${escapeHtml(
-                        new Date(e.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                    )}</div>
-                </div>
-                <div style="color: var(--text-secondary); font-size: 0.85rem; line-height: 1.4;">
-                    Bot: <strong>${escapeHtml(e.botName)}</strong><br/>
-                    Qty Δ: <strong>${sign}${Number(e.qtyDelta).toLocaleString(undefined, { maximumFractionDigits: 6 })}</strong> @ ${formatUSD(e.price)}<br/>
-                    USD impact: <strong>${formatSignedUSD(e.usdValue)}</strong><br/>
-                    ${e.reason ? `Reason: ${escapeHtml(e.reason)}` : ''}
-                </div>
-            </div>
-        `;
-    }).join('');
-}
-
-function updateClientBotActivityPanel(botId) {
-    const panel = document.getElementById(`portfolio-bot-activity-panel-${botId}`);
-    if (!panel) return;
-    panel.innerHTML = renderClientBotActivityItems(getClientBotEventsForBot(botId));
-}
-
-function toggleClientBotActivityPanel(botId) {
-    clientBotExpandedPanels[botId] = !clientBotExpandedPanels[botId];
-    renderBotsUI(); // re-render for button text + visibility state
-    if (clientBotExpandedPanels[botId]) {
-        updateClientBotActivityPanel(botId);
-    }
-}
-
-function deleteClientBot(botId) {
-    const bots = getClientBotState();
-    const bot = bots.find((b) => b.id === botId);
-    const name = bot?.name || 'bot';
-
-    const ok = confirm(`Delete "${name}"? This will stop the demo bot and remove its activity from the UI.`);
-    if (!ok) return;
-
-    if (clientBotIntervals[botId]) {
-        clearInterval(clientBotIntervals[botId]);
-        delete clientBotIntervals[botId];
-    }
-
-    // Remove bot + its events; keep holdings as-is (demo effect remains).
-    const remainingBots = bots.filter((b) => b.id !== botId);
-    setClientBotState(remainingBots);
-
-    const remainingEvents = getClientBotEvents().filter((e) => e.botId !== botId);
-    setClientBotEvents(remainingEvents);
-
-    delete clientBotExpandedPanels[botId];
-
-    renderBotsUI();
-    renderBotActivityUI();
-    renderPortfolio();
-}
-
-function restoreRunningBotsFromStorage() {
-    if (clientBotsRestored) return;
-    clientBotsRestored = true;
-
-    const bots = getClientBotState();
-    bots.forEach((bot) => {
-        if ((bot.state || bot.status) === 'running') {
-            startClientBot(bot.id, true);
-        }
-    });
-}
-
-function startClientBot(botId, silent = false) {
-    const bots = getClientBotState();
-    const bot = bots.find((b) => b.id === botId);
-    if (!bot) return;
-
-    if (bot.state !== 'running') {
-        bot.state = 'running';
-        setClientBotState(bots);
-    }
-
-    if (!silent) {
-        simulateBotTick(botId);
-        // Make sure the activity pane updates even if portfolio re-render is skipped.
-        renderBotActivityUI();
-    }
-
-    if (clientBotIntervals[botId]) return;
-    const intervalMs = Number(bot.intervalMs || 10000);
-    clientBotIntervals[botId] = setInterval(() => simulateBotTick(botId), intervalMs);
-    renderBotsUI();
-}
-
-function pauseClientBot(botId) {
-    const bots = getClientBotState();
-    const bot = bots.find((b) => b.id === botId);
-    if (!bot) return;
-
-    bot.state = 'paused';
-    setClientBotState(bots);
-
-    if (clientBotIntervals[botId]) {
-        clearInterval(clientBotIntervals[botId]);
-        delete clientBotIntervals[botId];
-    }
-    renderBotsUI();
-}
-
-function stopClientBot(botId) {
-    const bots = getClientBotState();
-    const bot = bots.find((b) => b.id === botId);
-    if (!bot) return;
-
-    bot.state = 'stopped';
-    setClientBotState(bots);
-
-    if (clientBotIntervals[botId]) {
-        clearInterval(clientBotIntervals[botId]);
-        delete clientBotIntervals[botId];
-    }
-    renderBotsUI();
-}
-
-function simulateBotTick(botId) {
-    const bots = getClientBotState();
-    const bot = bots.find((b) => b.id === botId);
-    if (!bot || bot.state !== 'running') return;
-
-    const holdings = getClientPortfolioHoldings();
-    const trackedCoins = getTrackedCoins();
-    const assets = Array.isArray(bot.assets) && bot.assets.length > 0 ? bot.assets : trackedCoins;
-    const holdingsSymbols = new Set(holdings.map((h) => h.symbol));
-    const actionableSymbols = assets.filter((s) => holdingsSymbols.has(s));
-    if (!actionableSymbols.length) return;
-
-    // Update market prices first, so decisions look live.
-    simulateMarketPrices(holdings, actionableSymbols, bot.intensity);
-
-    const symbol = actionableSymbols[Math.floor(Math.random() * actionableSymbols.length)];
-    if (symbol === 'USDC') return; // USDC is cash; not tradable
-    const holding = getClientHoldingsBySymbol(holdings, symbol);
-    if (!holding) return;
-
-    const action = chooseAction(bot, holding);
-    const currentPrice = Number(holding.currentPrice || 0);
-    if (!currentPrice || currentPrice <= 0) return;
-
-    // Demo fees + slippage for realism.
-    const feePercent = bot.intensity === 'high' ? 0.004 : bot.intensity === 'low' ? 0.0025 : 0.003;
-    const slipPct = bot.intensity === 'high' ? 0.0015 : bot.intensity === 'low' ? 0.0008 : 0.001;
-    const effectivePrice = action === 'buy'
-        ? currentPrice * (1 + slipPct)
-        : currentPrice * (1 - slipPct);
-
-    // Cash is USDC (demo realism).
-    const usdc = getClientHoldingsBySymbol(holdings, 'USDC');
-    const usdcQty = Number(usdc?.qty || 0);
-    const minUsdc = Number(bot.minUsdc ?? 250);
-
-    // Trade sizing.
-    const tradeSizeMode = bot.tradeSizeMode || 'fixed_usd';
-    const tradeSizeValue = Number(bot.tradeSizeValue || 500);
-    const percent = clamp(tradeSizeValue, 1, 100) / 100;
-
-    let usdTarget = 0;
-    if (tradeSizeMode === 'percent') {
-        usdTarget = action === 'buy'
-            ? usdcQty * percent
-            : Number(holding.qty || 0) * effectivePrice * percent;
-    } else {
-        usdTarget = Math.max(1, tradeSizeValue);
-    }
-
-    // Guards (min balance and max exposure).
-    const totalValue = holdings.reduce((s, h) => s + Number(h.qty || 0) * Number(h.currentPrice || 0), 0);
-    const maxExposurePct = clamp(Number(bot.maxExposurePct ?? 45), 5, 100) / 100;
-    const holdingValue = Number(holding.qty || 0) * Number(holding.currentPrice || 0);
-    const maxAllowed = totalValue * maxExposurePct;
-
-    if (action === 'buy') {
-        if (usdcQty < minUsdc) {
-            appendClientBotEvent({
-                id: generateId('evt'),
-                botId,
-                botName: bot.name || 'Bot',
-                time: new Date().toISOString(),
-                type: 'skip',
-                symbol,
-                qtyDelta: 0,
-                price: effectivePrice,
-                usdValue: 0,
-                reason: `SKIP — USDC below minimum (${formatUSD(usdcQty)} < ${formatUSD(minUsdc)})`,
-            });
-            renderBotActivityUI();
-            return;
-        }
-        if (holdingValue >= maxAllowed) {
-            appendClientBotEvent({
-                id: generateId('evt'),
-                botId,
-                botName: bot.name || 'Bot',
-                time: new Date().toISOString(),
-                type: 'skip',
-                symbol,
-                qtyDelta: 0,
-                price: effectivePrice,
-                usdValue: 0,
-                reason: `SKIP — max exposure reached for ${symbol} (${formatUSD(holdingValue)} ≥ ${formatUSD(maxAllowed)})`,
-            });
-            renderBotActivityUI();
-            return;
-        }
-        usdTarget = Math.min(usdTarget, Math.max(0, usdcQty - minUsdc));
-        if (usdTarget <= 1) {
-            appendClientBotEvent({
-                id: generateId('evt'),
-                botId,
-                botName: bot.name || 'Bot',
-                time: new Date().toISOString(),
-                type: 'skip',
-                symbol,
-                qtyDelta: 0,
-                price: effectivePrice,
-                usdValue: 0,
-                reason: `SKIP — not enough free USDC after minimum balance`,
-            });
-            renderBotActivityUI();
-            return;
-        }
-    }
-
-    let qtyDelta = 0;
-    let usdImpactSigned = 0;
-    if (action === 'buy') {
-        const qtyToBuy = usdTarget / effectivePrice;
-        const qtyAfterFee = qtyToBuy * (1 - feePercent);
-        qtyDelta = qtyAfterFee;
-        holding.qty = Number(holding.qty || 0) + qtyDelta;
-        if (usdc) usdc.qty = Math.max(0, usdcQty - usdTarget);
-        usdImpactSigned = usdTarget; // BUY spend (demo)
-
-        // Update bot virtual position cost basis.
-        const pos = bot.positions?.[symbol] || { qty: 0, avgCost: 0 };
-        const prevQty = Number(pos.qty || 0);
-        const newQty = prevQty + qtyDelta;
-        const prevCost = prevQty * Number(pos.avgCost || 0);
-        const addCost = qtyDelta * effectivePrice;
-        bot.positions = bot.positions || {};
-        bot.positions[symbol] = { qty: newQty, avgCost: newQty > 0 ? (prevCost + addCost) / newQty : 0 };
-    } else {
-        const sellable = Number(holding.qty || 0);
-        const qtyDesired = usdTarget / effectivePrice;
-        const sellQty = Math.min(sellable, qtyDesired);
-        if (sellQty <= 0) return;
-        qtyDelta = -sellQty;
-        holding.qty = Math.max(0, sellable - sellQty);
-        const usdReceived = sellQty * effectivePrice * (1 - feePercent);
-        if (usdc) usdc.qty = usdcQty + usdReceived;
-        usdImpactSigned = -usdReceived; // SELL impact
-
-        // Realized P/L for demo analytics using virtual avg cost.
-        const pos = bot.positions?.[symbol] || { qty: 0, avgCost: effectivePrice };
-        const avgCost = Number(pos.avgCost || effectivePrice);
-        const realized = (effectivePrice - avgCost) * sellQty;
-        bot.stats = bot.stats || { trades: 0, realizedPnlUsd: 0, wins: 0, losses: 0 };
-        bot.stats.realizedPnlUsd = Number(bot.stats.realizedPnlUsd || 0) + realized;
-        if (realized >= 0) bot.stats.wins = Number(bot.stats.wins || 0) + 1;
-        else bot.stats.losses = Number(bot.stats.losses || 0) + 1;
-        // Reduce virtual position qty.
-        const remainingQty = Math.max(0, Number(pos.qty || 0) - sellQty);
-        bot.positions = bot.positions || {};
-        bot.positions[symbol] = { qty: remainingQty, avgCost: remainingQty > 0 ? avgCost : 0 };
-    }
-
-    bot.stats = bot.stats || { trades: 0, realizedPnlUsd: 0, wins: 0, losses: 0 };
-    bot.stats.trades = Number(bot.stats.trades || 0) + 1;
-
-    setClientPortfolioHoldings(holdings);
-
-    const event = {
-        id: generateId('evt'),
-        botId,
-        botName: bot.name || 'Bot',
-        time: new Date().toISOString(),
-        type: action,
-        symbol,
-        qtyDelta,
-        price: effectivePrice,
-        usdValue: usdImpactSigned,
-        reason: buildReason(bot, action, symbol, holding),
-    };
-    appendClientBotEvent(event);
-
-    bot.lastEventAt = event.time;
-    setClientBotState(bots);
-
-    if (clientBotExpandedPanels[botId]) {
-        updateClientBotActivityPanel(botId);
-    }
-
-    renderBotActivityUI();
-    renderPortfolio();
-}
-
-function getBotConfigFromForm() {
-    const name = (document.getElementById('bot-name')?.value || 'Your Friend').trim() || 'Your Friend';
-    const mode = document.getElementById('bot-mode')?.value || 'both';
-    const strategy = document.getElementById('bot-strategy')?.value || 'both';
-    const intensity = document.getElementById('bot-intensity')?.value || 'medium';
-    const tradeSizeMode = document.getElementById('bot-trade-size-mode')?.value || 'fixed_usd';
-    const tradeSizeValue = Number(document.getElementById('bot-trade-size')?.value || 500);
-    const intervalMs = Number(document.getElementById('bot-interval')?.value || 10000);
-    const minUsdc = Number(document.getElementById('bot-min-usdc')?.value || 250);
-    const maxExposurePct = Number(document.getElementById('bot-max-exposure')?.value || 45);
-
-    const selectedAssets = getBotFormAssetsSelection();
-    return { name, mode, strategy, intensity, tradeSizeMode, tradeSizeValue, intervalMs, minUsdc, maxExposurePct, assets: selectedAssets };
-}
-
-function createClientBotFromForm() {
-    const cfg = getBotConfigFromForm();
-    if (!cfg.assets || cfg.assets.length === 0) {
-        alert('Please select at least one asset from the tracked list.');
-        return;
-    }
-    const bots = getClientBotState();
-    const now = new Date().toISOString();
-
-    if (clientBotEditingId) {
-        const bot = bots.find((b) => b.id === clientBotEditingId);
-        if (!bot) {
-            clientBotEditingId = null;
-        } else if (bot.state === 'running') {
-            alert('Pause/Stop the bot before editing.');
-            return;
-        } else {
-            Object.assign(bot, {
-                name: cfg.name,
-                assets: cfg.assets,
-                mode: cfg.mode,
-                strategy: cfg.strategy,
-                intensity: cfg.intensity,
-                tradeSizeMode: cfg.tradeSizeMode,
-                tradeSizeValue: cfg.tradeSizeValue,
-                intervalMs: cfg.intervalMs,
-                minUsdc: cfg.minUsdc,
-                maxExposurePct: cfg.maxExposurePct,
-            });
-            setClientBotState(bots);
-            finishBotEditMode();
-            renderBotsUI();
-            renderBotActivityUI();
-            return;
-        }
-    }
-
-    const newBot = {
-        id: generateId('bot'),
-        name: cfg.name,
-        assets: cfg.assets,
-        mode: cfg.mode,
-        strategy: cfg.strategy,
-        intensity: cfg.intensity,
-        tradeSizeMode: cfg.tradeSizeMode,
-        tradeSizeValue: cfg.tradeSizeValue,
-        intervalMs: cfg.intervalMs,
-        minUsdc: cfg.minUsdc,
-        maxExposurePct: cfg.maxExposurePct,
-        state: 'draft',
-        createdAt: now,
-        lastEventAt: null,
-        stats: { trades: 0, realizedPnlUsd: 0, wins: 0, losses: 0 },
-        positions: {},
-    };
-    bots.push(newBot);
-    setClientBotState(bots);
-    renderBotsUI();
-    renderBotActivityUI();
-}
-
-function beginEditClientBot(botId) {
-    const bots = getClientBotState();
-    const bot = bots.find((b) => b.id === botId);
-    if (!bot) return;
-    if (bot.state === 'running') {
-        alert('Pause/Stop the bot before editing.');
-        return;
-    }
-    clientBotEditingId = botId;
-
-    document.getElementById('bot-name').value = bot.name || '';
-    document.getElementById('bot-mode').value = bot.mode || 'both';
-    document.getElementById('bot-strategy').value = bot.strategy || 'both';
-    document.getElementById('bot-intensity').value = bot.intensity || 'medium';
-    document.getElementById('bot-trade-size-mode').value = bot.tradeSizeMode || 'fixed_usd';
-    document.getElementById('bot-trade-size').value = String(Number(bot.tradeSizeValue || 500));
-    document.getElementById('bot-interval').value = String(Number(bot.intervalMs || 10000));
-    document.getElementById('bot-min-usdc').value = String(Number(bot.minUsdc ?? 250));
-    document.getElementById('bot-max-exposure').value = String(Number(bot.maxExposurePct ?? 45));
-
-    // Assets selection
-    setBotFormAssetsSelection(Array.isArray(bot.assets) ? bot.assets : []);
-    renderBotAssetsSelector(getTrackedCoins());
-
-    const createBtn = document.getElementById('bot-create-btn');
-    const cancelBtn = document.getElementById('bot-cancel-edit-btn');
-    if (createBtn) createBtn.textContent = 'Save Bot';
-    if (cancelBtn) cancelBtn.style.display = '';
-}
-
-function finishBotEditMode() {
-    clientBotEditingId = null;
-    const createBtn = document.getElementById('bot-create-btn');
-    const cancelBtn = document.getElementById('bot-cancel-edit-btn');
-    if (createBtn) createBtn.textContent = 'Create Bot';
-    if (cancelBtn) cancelBtn.style.display = 'none';
-}
-
-function cancelBotEdit() {
-    finishBotEditMode();
-    // Keep assets selector consistent.
-    renderBotAssetsSelector(getTrackedCoins());
-}
-
-function cloneClientBot(botId) {
-    const bots = getClientBotState();
-    const bot = bots.find((b) => b.id === botId);
-    if (!bot) return;
-    const copy = JSON.parse(JSON.stringify(bot));
-    copy.id = generateId('bot');
-    copy.name = `${bot.name || 'Bot'} (copy)`;
-    copy.state = 'draft';
-    copy.createdAt = new Date().toISOString();
-    copy.lastEventAt = null;
-    copy.stats = { trades: 0, realizedPnlUsd: 0, wins: 0, losses: 0 };
-    copy.positions = {};
-    bots.push(copy);
-    setClientBotState(bots);
-    renderBotsUI();
-}
-
-function simulateBotOneCyclePreview() {
-    const cfg = getBotConfigFromForm();
-    if (!cfg.assets || cfg.assets.length === 0) {
-        alert('Please select at least one asset from the tracked list.');
-        return;
-    }
-
-    const holdings = getClientPortfolioHoldings();
-    const holdingsSymbols = new Set(holdings.map((h) => h.symbol));
-    const actionableSymbols = (cfg.assets || []).filter((s) => holdingsSymbols.has(s));
-    if (!actionableSymbols.length) return;
-
-    // Update market prices first for realism.
-    simulateMarketPrices(holdings, actionableSymbols, cfg.intensity);
-
-    const symbol = actionableSymbols[Math.floor(Math.random() * actionableSymbols.length)];
-    if (symbol === 'USDC') return; // USDC is cash; not tradable
-    const holding = getClientHoldingsBySymbol(holdings, symbol);
-    if (!holding) return;
-
-    const action = chooseAction(cfg, holding);
-    const currentPrice = Number(holding.currentPrice || 0);
-    if (!currentPrice || currentPrice <= 0) return;
-
-    const feePercent = cfg.intensity === 'high' ? 0.004 : cfg.intensity === 'low' ? 0.0025 : 0.003;
-    const slipPct = cfg.intensity === 'high' ? 0.0015 : cfg.intensity === 'low' ? 0.0008 : 0.001;
-    const effectivePrice = action === 'buy'
-        ? currentPrice * (1 + slipPct)
-        : currentPrice * (1 - slipPct);
-
-    const usdc = getClientHoldingsBySymbol(holdings, 'USDC');
-    const usdcQty = Number(usdc?.qty || 0);
-    const minUsdc = Number(cfg.minUsdc ?? 250);
-
-    const tradeSizeMode = cfg.tradeSizeMode || 'fixed_usd';
-    const tradeSizeValue = Number(cfg.tradeSizeValue || 500);
-    const percent = clamp(tradeSizeValue, 1, 100) / 100;
-
-    let usdTarget = 0;
-    if (tradeSizeMode === 'percent') {
-        usdTarget = action === 'buy'
-            ? usdcQty * percent
-            : Number(holding.qty || 0) * effectivePrice * percent;
-    } else {
-        usdTarget = Math.max(1, tradeSizeValue);
-    }
-
-    if (action === 'buy') {
-        if (usdcQty < minUsdc) {
-            appendClientBotEvent({
-                id: generateId('evt'),
-                botId: 'preview',
-                botName: `${cfg.name} (preview)`,
-                time: new Date().toISOString(),
-                type: 'skip',
-                symbol,
-                qtyDelta: 0,
-                price: effectivePrice,
-                usdValue: 0,
-                reason: `SKIP — USDC below minimum (${formatUSD(usdcQty)} < ${formatUSD(minUsdc)})`,
-            });
-            renderBotActivityUI();
-            return;
-        }
-        usdTarget = Math.min(usdTarget, Math.max(0, usdcQty - minUsdc));
-        if (usdTarget <= 1) {
-            appendClientBotEvent({
-                id: generateId('evt'),
-                botId: 'preview',
-                botName: `${cfg.name} (preview)`,
-                time: new Date().toISOString(),
-                type: 'skip',
-                symbol,
-                qtyDelta: 0,
-                price: effectivePrice,
-                usdValue: 0,
-                reason: `SKIP — not enough free USDC after minimum balance`,
-            });
-            renderBotActivityUI();
-            return;
-        }
-    }
-
-    let qtyDelta = 0;
-    let usdImpactSigned = 0;
-    if (action === 'buy') {
-        const qtyToBuy = usdTarget / effectivePrice;
-        const qtyAfterFee = qtyToBuy * (1 - feePercent);
-        qtyDelta = qtyAfterFee;
-        holding.qty = Number(holding.qty || 0) + qtyDelta;
-        if (usdc) usdc.qty = Math.max(0, usdcQty - usdTarget);
-        usdImpactSigned = usdTarget;
-    } else {
-        const sellable = Number(holding.qty || 0);
-        const qtyDesired = usdTarget / effectivePrice;
-        const sellQty = Math.min(sellable, qtyDesired);
-        if (sellQty <= 0) return;
-        qtyDelta = -sellQty;
-        holding.qty = Math.max(0, sellable - sellQty);
-        const usdReceived = sellQty * effectivePrice * (1 - feePercent);
-        if (usdc) usdc.qty = usdcQty + usdReceived;
-        usdImpactSigned = -usdReceived;
-    }
-    setClientPortfolioHoldings(holdings);
-
-    const event = {
-        id: generateId('evt'),
-        botId: 'preview',
-        botName: `${cfg.name} (preview)`,
-        time: new Date().toISOString(),
-        type: action,
-        symbol,
-        qtyDelta,
-        price: effectivePrice,
-        usdValue: usdImpactSigned,
-        reason: buildReason(cfg, action, symbol, holding),
-    };
-    appendClientBotEvent(event);
-
-    renderBotActivityUI();
-    renderPortfolio();
+    renderInvestorDashboard();
 }
 
 // ===== FILTERS =====
@@ -2707,6 +2808,7 @@ async function approveAction(actionId) {
 }
 
 async function executeAction(actionId) {
+    const action = appState.actions.find((a) => a.action_id === actionId);
     try {
         const response = await apiFetch(`${API_BASE}/actions/${actionId}/execute`, {
             method: 'POST'
@@ -2714,8 +2816,15 @@ async function executeAction(actionId) {
         const data = await response.json();
         
         if (data.success) {
-            showSuccess('Action executed');
-            loadDashboardData();
+            showSuccess('Action executed — opening integration preview');
+            await loadDashboardData();
+            if (action) {
+                await runWorkflowSimulatePreview({
+                    action_type: action.action_type,
+                    user_id: action.user_id,
+                    reason: action.reason || `Executed workflow ${action.action_type}`,
+                });
+            }
         }
     } catch (error) {
         console.error('Error executing action:', error);
@@ -2758,12 +2867,12 @@ async function viewUserDetail(userId) {
         if (wallet) {
             html += `
                 <div class="user-detail-section">
-                    <h3>Wallet Information</h3>
-                    <div class="detail-row"><span class="detail-label">Blockchain:</span><span class="detail-value">${wallet.blockchain}</span></div>
-                    <div class="detail-row"><span class="detail-label">Balance:</span><span class="detail-value">$${wallet.balance_usd ? wallet.balance_usd.toLocaleString() : '0'}</span></div>
-                    <div class="detail-row"><span class="detail-label">Activity Score:</span><span class="detail-value">${(wallet.activity_score || 0).toFixed(1)}/100</span></div>
-                    <div class="detail-row"><span class="detail-label">Transactions:</span><span class="detail-value">${wallet.transaction_count || 0}</span></div>
-                    <div class="detail-row"><span class="detail-label">Wallet Age:</span><span class="detail-value">${wallet.wallet_age_days || 0} days</span></div>
+                    <h3>AUM Snapshot</h3>
+                    <div class="detail-row"><span class="detail-label">Primary Custodian:</span><span class="detail-value">${formatCustodianLabel(wallet.blockchain)}</span></div>
+                    <div class="detail-row"><span class="detail-label">Reported AUM:</span><span class="detail-value">$${wallet.balance_usd ? wallet.balance_usd.toLocaleString() : '0'}</span></div>
+                    <div class="detail-row"><span class="detail-label">Engagement Score:</span><span class="detail-value">${(wallet.activity_score || 0).toFixed(1)}/100</span></div>
+                    <div class="detail-row"><span class="detail-label">Portal Touchpoints:</span><span class="detail-value">${wallet.transaction_count || 0}</span></div>
+                    <div class="detail-row"><span class="detail-label">Relationship Tenure:</span><span class="detail-value">${wallet.wallet_age_days || 0} days</span></div>
                 </div>
             `;
         }
@@ -2788,7 +2897,7 @@ async function viewUserDetail(userId) {
         if (data.risk_flags && data.risk_flags.length > 0) {
             html += `
                 <div class="user-detail-section">
-                    <h3>Risk Flags (${data.risk_flags.length})</h3>
+                    <h3>${brandTerm('riskFlags', 'Alerts')} (${data.risk_flags.length})</h3>
                     ${data.risk_flags.map(flag => `
                         <div style="margin-bottom: 1rem; padding: 1rem; background: var(--bg-tertiary); border-radius: 6px;">
                             <div style="margin-bottom: 0.5rem;">
@@ -2801,18 +2910,25 @@ async function viewUserDetail(userId) {
                 </div>
             `;
         }
+
+        html += `
+            <div class="user-detail-section">
+                <h3>Activity Timeline</h3>
+                ${buildActivityTimelineHtml(data)}
+            </div>
+        `;
         
         if (data.recovery_actions && data.recovery_actions.length > 0) {
             html += `
                 <div class="user-detail-section">
-                    <h3>Recovery Actions (${data.recovery_actions.length})</h3>
+                    <h3>${brandTerm('recoveryActions', 'Workflow Actions')} (${data.recovery_actions.length})</h3>
                     ${data.recovery_actions.map(action => `
                         <div style="margin-bottom: 1rem; padding: 1rem; background: var(--bg-tertiary); border-radius: 6px;">
                             <div style="margin-bottom: 0.5rem;">
                                 <strong>${action.type}</strong>
                                 <span class="badge status-${action.status}" style="margin-left: 0.5rem;">${action.status}</span>
                             </div>
-                            <div style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Recovery Value: $${(action.recovery_value || 0).toLocaleString()}</div>
+                            <div style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem;">${brandTerm('recoveryValue', 'Estimated Impact')}: $${(action.recovery_value || 0).toLocaleString()}</div>
                         </div>
                     `).join('')}
                 </div>
@@ -2829,6 +2945,19 @@ async function viewUserDetail(userId) {
 }
 
 // ===== HELPERS =====
+function formatCustodianLabel(value) {
+    const labels = {
+        schwab: 'Charles Schwab',
+        fidelity: 'Fidelity',
+        pershing: 'Pershing',
+        sei: 'SEI',
+        internal_fund: 'Internal Fund Admin',
+        morgan_stanley: 'Morgan Stanley',
+    };
+    const key = String(value || '').toLowerCase().replace(/\s+/g, '_');
+    return labels[key] || String(value || '—').replace(/_/g, ' ');
+}
+
 function getInsightIcon(flagType) {
     const icons = {
         'onboarding_delay': '📝',
@@ -2837,16 +2966,6 @@ function getInsightIcon(flagType) {
         'abandoned': '👋'
     };
     return icons[flagType] || '⚠️';
-}
-
-function getScenarioEmoji(type) {
-    const emojis = {
-        'onboarding_delay': '📝',
-        'inactivity': '😴',
-        'support_unresolved': '🆘',
-        'abandoned': '👋'
-    };
-    return emojis[type] || '🎯';
 }
 
 function showSuccess(message) {
@@ -2884,7 +3003,7 @@ function openSimulateActionModal({ mocks, logId, act }) {
         ? `Below is what those integrations <em>might</em> look like for <strong>${escapeHtml(actionLabel)}</strong> on <strong>${escapeHtml(uid)}</strong>.`
         : `Below is what those integrations <em>might</em> look like for <strong>${escapeHtml(actionLabel)}</strong> on this workflow.`;
     introEl.innerHTML = [
-        'This is a <strong>demo-only</strong> preview: nothing was actually sent to email, Jira, or a CRM.',
+        'This is a <strong>demo-only</strong> preview: nothing was actually sent to SendGrid, Jira, Salesforce, HubSpot, or Zendesk.',
         line2,
         logShort
             ? `We still write one row to the demo log so you can trace it (<code>${escapeHtml(logShort)}…</code>).`
@@ -3028,14 +3147,17 @@ function fillSimulateCardBody(bodyEl, obj) {
     });
 }
 
-/** Card grid: Email / Jira / CRM from mock payload. */
+/** Card grid: integration channels from mock payload. */
 function buildSimulateCards(mocks) {
     const grid = document.createElement('div');
     grid.className = 'chat-sim-grid';
     const channels = [
-        { key: 'email', title: 'Email', icon: '✉' },
+        { key: 'email', title: 'Email (SendGrid)', icon: '✉' },
+        { key: 'salesforce', title: 'Salesforce', icon: '☁' },
+        { key: 'hubspot', title: 'HubSpot', icon: '🟠' },
+        { key: 'zendesk', title: 'Zendesk', icon: '🎫' },
         { key: 'jira', title: 'Jira', icon: '◆' },
-        { key: 'crm', title: 'CRM', icon: '◇' },
+        { key: 'crm', title: 'CRM (legacy)', icon: '◇' },
     ];
     channels.forEach(({ key, title, icon }) => {
         const data = mocks[key];

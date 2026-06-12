@@ -1,6 +1,6 @@
 """
-SQLAlchemy ORM Models for the High-Value User Recovery Engine.
-Canonical data model representing entities from multiple crypto platform systems.
+SQLAlchemy ORM Models for the Investor Intelligence Platform demo.
+Canonical data model — internal table names retained for API stability; user-facing copy uses investor/CRM language.
 """
 
 from sqlalchemy import Column, String, Float, Integer, DateTime, Boolean, ForeignKey, Text

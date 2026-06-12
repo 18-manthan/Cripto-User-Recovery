@@ -21,11 +21,11 @@ logger = logging.getLogger(__name__)
 
 # Database schema information
 DATABASE_SCHEMA = """
-Database Schema for RUD System:
+Database Schema for Investor Intelligence Platform demo:
 
 Tables:
 1. user_profiles (id, email, name, acquisition_source, lifecycle_stage, estimated_ltv, first_seen_at, last_activity_at, country, source_system, external_id, last_synced_at)
-2. wallets (id, user_id, blockchain, balance_usd, wallet_age_days, transaction_count, activity_score, last_activity_at, source_system, external_id, last_synced_at)
+2. wallets (id, user_id, blockchain [custodian code], balance_usd [reported AUM], wallet_age_days [relationship tenure], transaction_count [portal touchpoints], activity_score [engagement 0-100], last_activity_at, source_system, external_id, last_synced_at)
 3. risk_flags (id, user_id, flag_type, severity, description, detected_at, days_since_detection, source_system, external_id, last_synced_at)
 4. support_tickets (id, user_id, subject, status, priority, category, created_at, last_updated, unresolved_days, source_system, external_id, last_synced_at)
 5. recovery_actions (id, user_id, action_type, status, priority, reason, created_at, executed_at, estimated_recovery_value, source_system, external_id, last_synced_at)
@@ -39,7 +39,7 @@ Key Relationships:
 
 Important Field Values:
 - lifecycle_stage: onboarding, active, inactive, churned, high_value
-- acquisition_source: twitter, discord, affiliate, paid_ads, organic, referral, content
+- acquisition_source: linkedin, referral, conference, paid_search, organic, partner, content
 - flag_type: onboarding_incomplete, inactivity, support_unresolved, compliance_issue, low_activity, unusual_behavior
 - severity: critical, high, medium, low
 - status (tickets): open, pending, resolved, escalated
@@ -47,15 +47,16 @@ Important Field Values:
 - priority: critical, high, medium, low
 - category (tickets): kyc_delay, withdrawal_issue, login_problem, transaction_error, compliance, account_locked, API_issue
 - action_type: email_outreach, priority_support, workflow_trigger, account_review, incentive_offer
-- channel: twitter, discord, affiliate, paid_ads, content, organic
+- channel: linkedin, referral, conference, paid_search, content, organic, partner
 """
 
-SYSTEM_PROMPT = """You are a SQL query generator for a High-Value User Recovery (RUD) system.
+SYSTEM_PROMPT = """You are a SQL query generator for an Investor Intelligence Platform demo.
 Your goal is to convert natural language questions into precise SQL queries.
+In user-facing language, user_profiles represent investors/clients and recovery_actions represent workflow automation actions.
 
 Database Schema:
 - user_profiles: id, email, name, lifecycle_stage, estimated_ltv, first_seen_at, last_activity_at, country, acquisition_source
-- wallets: id, user_id, blockchain, balance_usd, wallet_age_days, transaction_count, activity_score, last_activity_at
+- wallets: id, user_id, blockchain (custodian), balance_usd (AUM), wallet_age_days (tenure), transaction_count (portal touchpoints), activity_score, last_activity_at
 - risk_flags: id, user_id, flag_type, severity, description, detected_at, days_since_detection
 - support_tickets: id, user_id, subject, status, priority, category, created_at, last_updated, unresolved_days
 - recovery_actions: id, user_id, action_type, status, priority, reason, estimated_recovery_value, created_at, executed_at
@@ -75,15 +76,15 @@ Important values:
 - priority: critical, high, medium, low
 - category (tickets): kyc_delay, withdrawal_issue, login_problem, transaction_error, compliance, account_locked, API_issue
 - action_type: email_outreach, priority_support, workflow_trigger, account_review, incentive_offer
-- acquisition_source: twitter, discord, affiliate, paid_ads, organic, referral, content
+- acquisition_source: linkedin, referral, conference, paid_search, organic, partner, content
 
 COMMON QUERY PATTERNS:
 1. Risk Analysis: "How many critical risks?" → COUNT where severity='critical'
 2. User Lookup: "Show me [user_id] profile" → JOIN user_profiles with related tables
-3. High-Value Users: "High value users" → WHERE lifecycle_stage='high_value'
-4. Recovery Actions: "Pending actions" → WHERE status='pending'
+3. High-Value Investors: "High value users/investors" → WHERE lifecycle_stage='high_value'
+4. Workflow Actions: "Pending actions/workflows" → WHERE status='pending' on recovery_actions
 5. Support Tickets: "Unresolved tickets" → WHERE status != 'resolved'
-6. Statistics: "Total recovery potential" → SUM(estimated_recovery_value)
+6. Statistics: "Total pipeline value / recovery potential" → SUM(estimated_recovery_value)
 7. Breakdown: "Break down risk types" → GROUP BY flag_type with COUNT
 
 RESPOND EXACTLY IN THIS FORMAT (no other text):
@@ -121,6 +122,7 @@ class RUDAgent:
             "flag", "flags", "severity", "support", "ticket", "tickets", "recovery",
             "action", "actions", "campaign", "campaigns", "revenue", "spend", "roi",
             "ltv", "value", "high_value", "high-value", "inactive", "churned", "active",
+            "investor", "investors", "portfolio", "workflow", "workflows", "pipeline", "aum", "alert", "alerts",
             "onboarding", "critical", "high", "medium", "low", "pending", "approved",
             "executed", "failed", "kyc", "withdrawal", "login", "compliance", "database",
             "data", "sql", "count", "list", "show", "find", "which", "who", "total",
@@ -166,7 +168,7 @@ class RUDAgent:
         return any(marker in normalized for marker in self.abuse_markers)
 
     def is_relevant_data_query(self, user_query: str) -> bool:
-        """Allow only RUD/data-oriented questions through to SQL generation."""
+        """Allow only demo data-oriented questions through to SQL generation."""
         normalized = self._normalize_query(user_query)
         tokens = set(self._tokenize_query(normalized))
 
@@ -421,8 +423,8 @@ If possible, restate what the user is asking about in business language and sugg
         except Exception:
             return (
                 f"I couldn't retrieve the exact result for '{user_query}' just now, "
-                "but I can still help with broader user recovery questions like critical actions, "
-                "high-value users, or risk summaries."
+                "but I can still help with broader investor operations questions like critical workflows, "
+                "high-value investors, or alert summaries."
             )
     
     def format_response(self, query_results: Dict[str, Any], user_query: str) -> str:
@@ -446,7 +448,7 @@ If possible, restate what the user is asking about in business language and sugg
                     {
                         "role": "system",
                         "content": (
-                            "You are a courteous analyst for a high-value user recovery (RUD) demo in a crypto context. "
+                            "You are a courteous analyst for an Investor Intelligence Platform demo. "
                             "Given the user's question and JSON result rows, summarize using ONLY numbers and facts in that JSON — "
                             "do not invent counts, users, or severities. "
                             "Be concise (1–3 sentences), warm and professional, not robotic (avoid 'Found X record(s)')."
@@ -479,14 +481,14 @@ If possible, restate what the user is asking about in business language and sugg
         # Casual / wellbeing / thanks — phrase match first (before SQL or stiff guardrails)
         _wellbeing = (
             "I'm doing well, thank you for asking and I hope you're having a good day as well. "
-            "I'm here to help you work through this recovery demo the way a retention or risk team might look at a crypto exchange or "
-            "custody book: balances, activity, tickets, and who probably deserves a careful, personal touch. "
-            "Whenever you're ready, ask about risk flags, a user id, recovery actions, or portfolio-style metrics."
+            "I'm here to help you work through this investor operations demo the way a portfolio or client success team might: "
+            "balances, activity, support cases, and who deserves a careful, personal touch. "
+            "Whenever you're ready, ask about alerts, an investor id, workflow actions, or portfolio-style metrics."
         )
         _thanks = (
             "You're very welcome, happy to help. "
-            "If you'd like to go deeper, we could look at high-value users at-risk, open compliance or withdrawal tickets, "
-            "or recovery potential in this demo dataset."
+            "If you'd like to go deeper, we could look at high-value investors at-risk, open compliance or withdrawal tickets, "
+            "or pipeline value in this demo dataset."
         )
         phrase_replies: List[
             Tuple[re.Pattern[str], Union[str, Callable[[Any], str]]]
@@ -500,20 +502,20 @@ If possible, restate what the user is asking about in business language and sugg
                     r"^(hi|hey|hello|yo)[,!. ]*\s*(there|buddy|friend|pal|mate)?\s*[!.?]*$"
                 ),
                 "Hello — good to connect. "
-                "I'm here for this high-value user recovery workspace: on-chain-style balances and activity, risk flags, "
-                "and the sort of follow-ups operators use when markets are noisy and churn is costly. "
-                "What would you like to explore first — for example critical risks, inactive whales, or a named demo user?",
+                "I'm here for this investor intelligence workspace: portfolio balances and activity, alerts, "
+                "and the sort of follow-ups operators use when engagement drops or opportunities arise. "
+                "What would you like to explore first — for example critical alerts, inactive high-value investors, or a named demo investor?",
             ),
             (
                 re.compile(r"^(what\'?s\s+up|sup)\??$"),
-                "Not much on my side except being ready to help with your RUD data. "
-                "Ask me about users, wallets, risk severity, tickets, or recovery actions — whatever fits what you're trying to prove in the demo.",
+                "Not much on my side except being ready to help with your demo data. "
+                "Ask me about investors, wallets, alert severity, tickets, or workflow actions — whatever fits what you're trying to prove in the demo.",
             ),
             (
                 re.compile(r"^(good\s+(morning|afternoon|evening))\b"),
                 lambda m: (
                     f"{m.group(1).capitalize()} — thank you for stopping by. "
-                    "I'm here to support questions about this recovery dashboard: user health, flags, and next best actions. "
+                    "I'm here to support questions about this operations dashboard: investor health, alerts, and next best actions. "
                     "Where would you like to start?"
                 ),
             ),
@@ -537,16 +539,16 @@ If possible, restate what the user is asking about in business language and sugg
         # Greetings and meta questions
         greeting_responses = {
             # Greetings
-            'hello': "Hello — I'm glad you're here. I can help you interpret this RUD demo like a trading or growth team reviewing at-risk accounts: who's dormant, who's flagged, and where recovery spend might earn its keep.",
-            'hi': "Hi — lovely to hear from you. Ask me about users, risk flags, recovery actions, or campaign performance in this dataset, in whatever order suits you.",
-            'hey': "Hey there. I'm tuned for this recovery console — think flows, balances, ticket queues, and who needs priority handling when volatility picks up.",
+            'hello': "Hello — I'm glad you're here. I can help you interpret this investor intelligence demo like an operations team reviewing portfolios: who's dormant, who's flagged, and where engagement effort might earn its keep.",
+            'hi': "Hi — lovely to hear from you. Ask me about investors, alerts, workflow actions, or campaign performance in this dataset, in whatever order suits you.",
+            'hey': "Hey there. I'm tuned for this operations console — think workflows, balances, ticket queues, and who needs priority handling when engagement drops.",
             'greetings': "Greetings. I'm here to make this demo database easy to read: summaries, lookups, and a clear picture of exposure and opportunity.",
             
             # Meta questions about my capabilities
-            'what can you do': "I can help you with:\n• Risk analysis — critical and high-severity flags\n• User context — lifecycle, LTV, acquisition, geography\n• Wallet-style signals — balances, activity, throughput (as modeled here)\n• Recovery actions — pending, approved, and value at stake\n• Support tickets — backlog and categories such as KYC or withdrawals\n• Metrics — counts, breakdowns, and high-value segments",
-            'what do you do': "I turn plain-language questions into SQL against this demo, then summarize what matters — similar to how teams interrogate a warehouse before deciding who to call or waive fees for. Ask naturally; I'll stay polite and data-grounded.",
-            'help': "You might try:\n• 'How many critical risk flags are there?'\n• 'Show high-value inactive users'\n• 'Open compliance or withdrawal tickets'\n• 'Tell me about demo_elena_highvalue_withdrawal'\n\nI'll answer from the database and keep explanations steady and respectful.",
-            'capabilities': "I focus on: risk severity, user and wallet snapshots, recovery pipelines, tickets, campaigns, and roll-ups — the operational side of keeping valuable traders and holders engaged.",
+            'what can you do': "I can help you with:\n• Alert analysis — critical and high-severity flags\n• Investor context — lifecycle, LTV, acquisition, geography\n• Portfolio signals — balances, activity, throughput (as modeled here)\n• Workflow actions — pending, approved, and estimated impact\n• Support tickets — backlog and categories such as KYC or withdrawals\n• Metrics — counts, breakdowns, and high-value segments",
+            'what do you do': "I turn plain-language questions into SQL against this demo, then summarize what matters — similar to how teams interrogate a warehouse before deciding who to contact or prioritize. Ask naturally; I'll stay polite and data-grounded.",
+            'help': "You might try:\n• 'How many critical alerts are there?'\n• 'Show high-value inactive investors'\n• 'Open compliance or withdrawal tickets'\n• 'Tell me about demo_elena_highvalue_withdrawal'\n\nI'll answer from the database and keep explanations steady and respectful.",
+            'capabilities': "I focus on: alert severity, investor and wallet snapshots, workflow pipelines, tickets, campaigns, and roll-ups — the operational side of keeping valuable investors engaged.",
             'commands': "No special commands needed — just ask. Examples: critical risk count, pending actions, users above an LTV threshold, or a specific user id.",
             'examples': "For example:\n• Counts and breakdowns of flags or stages\n• Lists of users worth a white-glove path\n• A single-user snapshot with suggested (demo-only) next steps\n\nPick whatever helps your narrative.",
         }
@@ -567,15 +569,15 @@ If possible, restate what the user is asking about in business language and sugg
         if self.is_abusive(normalized):
             return self._safe_text_response(
                 user_query,
-                "I'd like to keep things respectful — I'm here for your RUD demo questions. "
-                "If you're open to it, we could look at users, risk flags, recovery actions, tickets, or campaign metrics instead."
+                "I'd like to keep things respectful — I'm here for your investor intelligence demo questions. "
+                "If you're open to it, we could look at investors, alerts, workflow actions, tickets, or campaign metrics instead."
             )
 
         if not self.is_relevant_data_query(normalized):
             return self._safe_text_response(
                 user_query,
-                "I specialise in this workspace — think high-value user retention in a crypto-native context: "
-                "balances and activity as we model them, ticket queues, risk flags, and recovery plays. "
+                "I specialise in this workspace — think investor engagement and portfolio operations: "
+                "balances and activity as we model them, ticket queues, alerts, and workflow automation. "
                 "I don't have much to add outside that, but if you point me at a metric, a segment, or a user id in this demo, "
                 "I'll walk through it carefully with you."
             )
@@ -609,7 +611,7 @@ If possible, restate what the user is asking about in business language and sugg
             sql_result = self.generate_sql(augmented)
         
         if "error" in sql_result or sql_result.get("sql_query") is None:
-            polite_error = f"I apologize, but I had difficulty understanding your query. Could you please rephrase it? For example:\n• 'How many critical risk flags are there?'\n• 'Show me high-value users'\n• 'What recovery actions are pending?'\n\nOr ask for 'help' to see what I can do!"
+            polite_error = f"I apologize, but I had difficulty understanding your query. Could you please rephrase it? For example:\n• 'How many critical alerts are there?'\n• 'Show me high-value investors'\n• 'What workflow actions are pending?'\n\nOr ask for 'help' to see what I can do!"
             return {
                 "success": False,
                 "query": user_query,
