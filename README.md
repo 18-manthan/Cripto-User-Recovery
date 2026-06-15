@@ -6,8 +6,9 @@ Minimal instructions to run and update the demo on a VM.
 - **FastAPI backend** serving both the API and the static dashboard UI
 - **Dual portals**: Operations (CRM, marketing, integration hub, workflows, alerts, investors, AI) and Investor (dashboard, portfolio, documents, connected accounts, assistant)
 - **Database**: Postgres (via `DATABASE_URL`)
-- **AI chat**: uses OpenAI (`OPENAI_API_KEY`)
+- **AI chat**: uses **Groq** (`GROQ_API_KEY`) via OpenAI-compatible API; optional OpenAI fallback
 - **Branding**: edit `frontend/demo-branding.js` to re-skin copy without code changes
+- **Client demo script**: [CLIENT_DEMO_SCRIPT.md](CLIENT_DEMO_SCRIPT.md)
 
 ## VM URL
 - Domain & Dashboard: `https://demo.rgcis.ai/`

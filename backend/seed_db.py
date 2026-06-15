@@ -463,7 +463,7 @@ def build_wallet(user_id: str, w: Dict[str, Any]) -> Wallet:
     last_tx = now - timedelta(days=int(w["last_tx_days_ago"]))
     return Wallet(
         id=f"wallet_{user_id}",
-        user_id=user_id,
+                user_id=user_id,
         blockchain=w.get("blockchain", "ethereum"),
         balance_usd=float(w["balance_usd"]),
         wallet_age_days=int(w["wallet_age_days"]),
@@ -639,7 +639,7 @@ def derive_risk_flags(user: UserProfile, wallet: Wallet, tickets: Sequence[Suppo
             f"Elevated portal activity: {wallet.transaction_count} touchpoints over ~{wallet.wallet_age_days}d — review allocation change pattern.",
             random.randint(1, 5),
         )
-
+    
     return flags
 
 
@@ -690,11 +690,11 @@ def derive_recovery_actions(user: UserProfile, flags: Sequence[RiskFlag]) -> Lis
                     id=f"{user.id}_act_{len(actions)}",
                     user_id=user.id,
                     action_type=atype,
-                    status=status,
+                status=status,
                     priority=apriority,
                     reason=f"Recommended {atype.replace('_', ' ')} for {flag.flag_type} ({flag.severity}): {flag.description[:120]}",
                     created_at=now - timedelta(days=created_days),
-                    executed_at=executed_at,
+                executed_at=executed_at,
                     estimated_recovery_value=base,
                     source_system="demo_orchestrator",
                     external_id=f"playbook_{user.id}_{len(actions)}",
@@ -702,7 +702,7 @@ def derive_recovery_actions(user: UserProfile, flags: Sequence[RiskFlag]) -> Lis
                 )
             )
             break
-
+    
     return actions
 
 
@@ -925,14 +925,14 @@ def seed_campaigns(db: Session) -> None:
         roi = (revenue - spend) / spend * 100 if spend > 0 else 0.0
         db.add(
             Campaign(
-                id=camp_id,
-                campaign_name=name,
-                channel=channel,
-                spend_usd=spend,
-                conversions=conversions,
-                revenue_usd=revenue,
-                cpa=cpa,
-                roi=roi,
+            id=camp_id,
+            campaign_name=name,
+            channel=channel,
+            spend_usd=spend,
+            conversions=conversions,
+            revenue_usd=revenue,
+            cpa=cpa,
+            roi=roi,
                 source_system="demo_marketing",
                 external_id=f"ads_{camp_id}",
                 last_synced_at=_now(),
@@ -1004,14 +1004,14 @@ def seed_users(db: Session, num_procedural: int = 388) -> None:
 
 def print_stats(db: Session) -> None:
     from sqlalchemy import func
-
+    
     total_users = db.query(func.count(UserProfile.id)).scalar()
     total_wallets = db.query(func.count(Wallet.id)).scalar()
     high_value_users = db.query(func.count(UserProfile.id)).filter(UserProfile.lifecycle_stage == "high_value").scalar()
     critical_risks = db.query(func.count(RiskFlag.id)).filter(RiskFlag.severity == "critical").scalar()
     pending_actions_db = db.query(func.count(RecoveryAction.id)).filter(RecoveryAction.status == "pending").scalar()
     open_tickets = db.query(func.count(SupportTicket.id)).filter(SupportTicket.status == "open").scalar()
-
+    
     print("\n📊 DATABASE STATISTICS:")
     print(f"  Total Users: {total_users}")
     print(f"  Wallets: {total_wallets}")

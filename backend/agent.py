@@ -1,6 +1,6 @@
 """
 Agentic Chatbot - Converts natural language queries to SQL and back
-Uses OpenAI for intelligent query generation and response formatting
+Uses Groq (OpenAI-compatible API) for query generation and response formatting
 """
 
 import os
@@ -15,9 +15,52 @@ from sqlalchemy import text, inspect
 from database import SessionLocal
 from models import UserProfile, Wallet, RiskFlag, SupportTicket, RecoveryAction, Campaign
 
-# Initialize OpenAI client
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY", ""))
+try:
+    from dotenv import load_dotenv
+    from pathlib import Path
+    load_dotenv(Path(__file__).resolve().parent / ".env")
+except ImportError:
+    pass
+
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile"
+DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
 logger = logging.getLogger(__name__)
+
+
+def get_llm_provider() -> str:
+    """Return active LLM provider: groq, openai, or empty string."""
+    if (os.getenv("GROQ_API_KEY") or "").strip():
+        return "groq"
+    if (os.getenv("OPENAI_API_KEY") or "").strip():
+        return "openai"
+    return ""
+
+
+def get_llm_model() -> str:
+    provider = get_llm_provider()
+    if provider == "groq":
+        return (os.getenv("GROQ_MODEL") or DEFAULT_GROQ_MODEL).strip()
+    if provider == "openai":
+        return (os.getenv("OPENAI_MODEL") or DEFAULT_OPENAI_MODEL).strip()
+    return DEFAULT_GROQ_MODEL
+
+
+def get_llm_api_key_env() -> str:
+    return "GROQ_API_KEY" if get_llm_provider() == "groq" else "OPENAI_API_KEY"
+
+
+def create_llm_client() -> Optional[OpenAI]:
+    groq_key = (os.getenv("GROQ_API_KEY") or "").strip()
+    if groq_key:
+        return OpenAI(api_key=groq_key, base_url=GROQ_BASE_URL)
+    openai_key = (os.getenv("OPENAI_API_KEY") or "").strip()
+    if openai_key:
+        return OpenAI(api_key=openai_key)
+    return None
+
+
+client = create_llm_client()
 
 # Database schema information
 DATABASE_SCHEMA = """
@@ -115,7 +158,9 @@ class RUDAgent:
     MAX_RESULT_STRING_LENGTH = 2000  # Max characters for results JSON
     
     def __init__(self):
-        self.client = client
+        self.client = client or create_llm_client()
+        self.llm_model = get_llm_model()
+        self.llm_provider = get_llm_provider()
         self.db = SessionLocal()
         self.allowed_keywords = {
             "user", "users", "profile", "profiles", "wallet", "wallets", "risk", "risks",
@@ -242,53 +287,71 @@ class RUDAgent:
         return schema_info
     
     def _ai_data_error(self, exc: Exception, where: str) -> Dict[str, Any]:
-        """Map OpenAI/client failures to actionable messages for operators."""
+        """Map LLM client failures to actionable messages for operators."""
+        provider = self.llm_provider or get_llm_provider() or "groq"
+        key_env = "GROQ_API_KEY" if provider == "groq" else "OPENAI_API_KEY"
+        provider_label = "Groq" if provider == "groq" else "OpenAI"
         if isinstance(exc, APIConnectionError):
             return {
                 "sql_query": None,
                 "error": (
-                    "AI service unreachable (network/VPN/firewall or OpenAI outage). "
+                    f"AI service unreachable (network/VPN/firewall or {provider_label} outage). "
                     "Check you can reach the internet, try disabling VPN, "
-                    "and confirm OPENAI_API_KEY is set on the server. "
+                    f"and confirm {key_env} is set on the server. "
                     f"({where})"
                 ),
             }
         if isinstance(exc, AuthenticationError):
             return {
                 "sql_query": None,
-                "error": "OpenAI rejected the API key. Set a valid OPENAI_API_KEY in the environment and restart the server.",
+                "error": (
+                    f"{provider_label} rejected the API key. Set a valid {key_env} "
+                    "in the environment (e.g. backend/.env) and restart the server."
+                ),
             }
         if isinstance(exc, RateLimitError):
             return {
                 "sql_query": None,
-                "error": "OpenAI rate limit reached. Wait a minute and try again, or use a tier with higher limits.",
+                "error": f"{provider_label} rate limit reached. Wait a minute and try again.",
             }
         if isinstance(exc, APITimeoutError):
             return {
                 "sql_query": None,
-                "error": "OpenAI request timed out. Try a shorter question or try again.",
+                "error": f"{provider_label} request timed out. Try a shorter question or try again.",
             }
         return {
             "sql_query": None,
             "error": f"{where}: {exc}",
         }
 
+    def _llm_chat(self, *, messages: List[Dict[str, str]], temperature: float, max_tokens: int):
+        if not self.client:
+            raise RuntimeError("No LLM API key configured (set GROQ_API_KEY in backend/.env)")
+        return self.client.chat.completions.create(
+            model=self.llm_model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+
     def generate_sql(self, user_query: str) -> Dict[str, Any]:
-        """Generate SQL query from natural language using OpenAI"""
-        if not (os.getenv("OPENAI_API_KEY") or "").strip():
+        """Generate SQL query from natural language using the configured LLM."""
+        if not get_llm_provider():
             return {
                 "sql_query": None,
-                "error": "OPENAI_API_KEY is not set. Add it to the server environment (e.g. backend/.env) and restart.",
+                "error": (
+                    "GROQ_API_KEY is not set. Add it to backend/.env "
+                    "(https://console.groq.com/keys) and restart the server."
+                ),
             }
         try:
-            response = self.client.chat.completions.create(
-                model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+            response = self._llm_chat(
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": user_query}
+                    {"role": "user", "content": user_query},
                 ],
                 temperature=0.1,
-                max_tokens=400
+                max_tokens=400,
             )
             
             response_text = response.choices[0].message.content.strip()
@@ -307,7 +370,7 @@ class RUDAgent:
                 }
         
         except Exception as e:
-            return self._ai_data_error(e, "OpenAI generate_sql")
+            return self._ai_data_error(e, "LLM generate_sql")
 
     def refine_sql(self, user_query: str, failed_sql: str, execution_error: str) -> Dict[str, Any]:
         """Ask the model to repair an invalid SQL query using the schema and runtime error."""
@@ -336,14 +399,13 @@ Remember:
 - SELECT only
 - include LIMIT 1000
 """
-            response = self.client.chat.completions.create(
-                model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+            response = self._llm_chat(
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": prompt}
+                    {"role": "user", "content": prompt},
                 ],
                 temperature=0.0,
-                max_tokens=500
+                max_tokens=500,
             )
             response_text = response.choices[0].message.content.strip()
             parsed = self._extract_sql_and_explanation(response_text)
@@ -360,7 +422,7 @@ Remember:
                 "explanation": response_text[:200]
             }
         except Exception as e:
-            err = self._ai_data_error(e, "OpenAI refine_sql")
+            err = self._ai_data_error(e, "LLM refine_sql")
             err["error"] = err.get("error") or f"Error refining SQL: {e}"
             return err
     
@@ -400,8 +462,7 @@ Remember:
     def generate_generalized_answer(self, user_query: str) -> str:
         """Return a safe, non-technical fallback answer when exact SQL retrieval fails."""
         try:
-            response = self.client.chat.completions.create(
-                model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+            response = self._llm_chat(
                 messages=[
                     {
                         "role": "system",
@@ -409,15 +470,12 @@ Remember:
 Give a safe fallback answer when exact database retrieval is unavailable.
 Do not mention SQL, schemas, exceptions, or technical failures.
 Keep it short, clear, and helpful.
-If possible, restate what the user is asking about in business language and suggest a slightly broader phrasing they can use next."""
+If possible, restate what the user is asking about in business language and suggest a slightly broader phrasing they can use next.""",
                     },
-                    {
-                        "role": "user",
-                        "content": f"User question: {user_query}"
-                    }
+                    {"role": "user", "content": f"User question: {user_query}"},
                 ],
                 temperature=0.3,
-                max_tokens=120
+                max_tokens=120,
             )
             return response.choices[0].message.content.strip()
         except Exception:
@@ -442,8 +500,7 @@ If possible, restate what the user is asking about in business language and sugg
         
         # Use LLM to generate natural language response
         try:
-            response = self.client.chat.completions.create(
-                model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+            response = self._llm_chat(
                 messages=[
                     {
                         "role": "system",
@@ -460,11 +517,11 @@ If possible, restate what the user is asking about in business language and sugg
                         Query returned {row_count} result(s).
                         Data: {results_summary}
                         
-                        Provide a natural language response to the user's question."""
-                    }
+                        Provide a natural language response to the user's question.""",
+                    },
                 ],
                 temperature=0.7,
-                max_tokens=200
+                max_tokens=200,
             )
             
             return response.choices[0].message.content.strip()

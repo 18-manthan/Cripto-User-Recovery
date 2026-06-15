@@ -305,6 +305,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupInvestorChatInterface();
     setupWorkflowTabs();
     setupResetAllDemoButton();
+    setupInvestorDocumentUpload();
     initAuthBackdrop();
 
     if (isClientAuthenticated()) {
@@ -1510,10 +1511,12 @@ function renderMarketing() {
 const OPS_CONNECTOR_STATE_KEY = 'rud_ops_connectors';
 const OPS_CONNECTOR_SYNC_LOG_KEY = 'rud_ops_connector_sync_log';
 const OPS_CONNECTORS = [
+    { id: 'xero', name: 'Xero', description: 'Australian accounting, invoicing, and entity financials.', placeholder: 'Xero OAuth token (demo)' },
+    { id: 'myob', name: 'MYOB', description: 'MYOB accounting, payroll, and SME ledger data.', placeholder: 'MYOB API key (demo)' },
     { id: 'salesforce', name: 'Salesforce', description: 'CRM accounts, opportunities, and investor stages.', placeholder: 'Salesforce access token (demo)' },
     { id: 'hubspot', name: 'HubSpot', description: 'Marketing contacts, lists, and nurture workflows.', placeholder: 'HubSpot private app token (demo)' },
-    { id: 'google_ads', name: 'Google Ads', description: 'Campaign spend, clicks, and conversion imports.', placeholder: 'Google Ads developer token (demo)' },
-    { id: 'mailchimp', name: 'Mailchimp', description: 'Email campaigns and audience segments.', placeholder: 'Mailchimp API key (demo)' },
+    { id: 'netwealth', name: 'Netwealth', description: 'Australian wrap platform — adviser book and investor balances.', placeholder: 'Netwealth adviser API key (demo)' },
+    { id: 'macquarie', name: 'Macquarie', description: 'Macquarie wealth, wrap, and custody account feeds.', placeholder: 'Macquarie integration token (demo)' },
     { id: 'zendesk', name: 'Zendesk', description: 'Support tickets and SLA metrics.', placeholder: 'Zendesk API token (demo)' },
     { id: 'slack', name: 'Slack', description: 'Ops alerts and workflow notifications.', placeholder: 'Slack bot token (demo)' },
 ];
@@ -1602,10 +1605,12 @@ function runOpsConnectorSync(connectorId) {
 
     const now = new Date().toISOString();
     const bodies = {
+        xero: `Synced ${8 + Math.floor(Math.random() * 12)} Xero entities and ${40 + Math.floor(Math.random() * 60)} invoice lines into reporting views (demo).`,
+        myob: `Imported ${5 + Math.floor(Math.random() * 10)} MYOB company files and refreshed payroll summaries (demo).`,
         salesforce: `Synced ${14 + Math.floor(Math.random() * 20)} accounts and ${3 + Math.floor(Math.random() * 8)} opportunities into CRM Pipeline view (demo).`,
         hubspot: `Imported ${22 + Math.floor(Math.random() * 30)} contacts and ${2 + Math.floor(Math.random() * 5)} marketing lists (demo).`,
-        google_ads: `Pulled ${4 + Math.floor(Math.random() * 6)} campaigns, ${1200 + Math.floor(Math.random() * 4000)} clicks, and ${18 + Math.floor(Math.random() * 25)} conversions into Marketing dashboard (demo).`,
-        mailchimp: `Updated ${3 + Math.floor(Math.random() * 4)} email campaigns and ${800 + Math.floor(Math.random() * 2000)} subscriber events (demo).`,
+        netwealth: `Pulled ${120 + Math.floor(Math.random() * 80)} wrap accounts and ${18 + Math.floor(Math.random() * 25)} investor balance snapshots (demo).`,
+        macquarie: `Refreshed ${45 + Math.floor(Math.random() * 35)} Macquarie wrap and custody positions (demo).`,
         zendesk: `Imported ${6 + Math.floor(Math.random() * 12)} tickets and refreshed SLA dashboard metrics (demo).`,
         slack: `Posted ${2 + Math.floor(Math.random() * 4)} workflow alerts to #investor-ops channel (demo).`,
     };
@@ -1972,6 +1977,7 @@ function resetClientDemoState() {
     localStorage.removeItem(CLIENT_WATCHED_HOLDINGS_KEY);
     localStorage.removeItem(CLIENT_CONNECTOR_STATE_KEY);
     localStorage.removeItem(CLIENT_CONNECTOR_SYNC_LOG_KEY);
+    localStorage.removeItem(INVESTOR_UPLOADED_DOCS_KEY);
 }
 
 function resetClientDemo() {
@@ -2039,6 +2045,9 @@ function resetAllDemoData() {
         loadDashboardData().then(() => {
             renderOverview();
             updateHealthStatus();
+            renderCrmPipeline();
+            renderMarketing();
+            renderOpsIntegrations();
         });
     }
     showSuccess('Demo reset to showcase defaults');
@@ -2053,28 +2062,46 @@ const CLIENT_CONNECTOR_STATE_KEY = 'rud_client_connectors';
 const CLIENT_CONNECTOR_SYNC_LOG_KEY = 'rud_client_connector_sync_log';
 const CLIENT_CONNECTORS = [
     {
-        id: 'plaid',
-        name: 'Plaid',
-        description: 'Banking & custody account aggregation (demo only).',
-        placeholder: 'Paste Plaid secret (demo)'
+        id: 'netwealth',
+        name: 'Netwealth',
+        description: 'Australian wrap platform — holdings and investor balances (demo only).',
+        placeholder: 'Netwealth adviser code (demo)',
     },
     {
-        id: 'salesforce_investor',
-        name: 'Salesforce Investor Portal',
-        description: 'Sync investor relationship data (demo only).',
-        placeholder: 'Paste Salesforce token (demo)'
+        id: 'macquarie',
+        name: 'Macquarie',
+        description: 'Macquarie banking, wrap accounts, and wealth balances (demo only).',
+        placeholder: 'Macquarie client ID (demo)',
+    },
+    {
+        id: 'commbank',
+        name: 'CommBank NetBank',
+        description: 'Commonwealth Bank accounts and cash positions (demo only).',
+        placeholder: 'NetBank Open Banking token (demo)',
+    },
+    {
+        id: 'anz',
+        name: 'ANZ',
+        description: 'ANZ banking and custody account aggregation (demo only).',
+        placeholder: 'ANZ API token (demo)',
+    },
+    {
+        id: 'xero',
+        name: 'Xero',
+        description: 'Business entity accounts and trust distributions (demo only).',
+        placeholder: 'Xero connection key (demo)',
     },
     {
         id: 'docusign',
         name: 'DocuSign',
-        description: 'Statements and subscription documents (demo only).',
-        placeholder: 'Paste integration key (demo)'
+        description: 'Statements, IMs, and subscription documents (demo only).',
+        placeholder: 'DocuSign integration key (demo)',
     },
     {
-        id: 'yahoo',
-        name: 'Yahoo Finance',
-        description: 'Market price snapshots for portfolio holdings (demo only).',
-        placeholder: 'Paste API key (demo)'
+        id: 'commsec',
+        name: 'CommSec',
+        description: 'ASX listed holdings and market price snapshots (demo only).',
+        placeholder: 'CommSec API key (demo)',
     },
 ];
 
@@ -2143,7 +2170,7 @@ function renderConnectorSyncLog() {
 }
 
 function applyDemoPriceRefreshFromConnector(intensity = 'medium') {
-    // Make Yahoo sync feel tangible by refreshing prices + 24h changes.
+    // Make CommSec sync feel tangible by refreshing prices + 24h changes.
     const holdings = getClientPortfolioHoldings();
     const symbols = holdings.map((h) => h.symbol);
     simulateMarketPrices(holdings, symbols, intensity);
@@ -2164,23 +2191,41 @@ function runConnectorSync(connectorId) {
     // Mock results for storytelling.
     const now = new Date().toISOString();
     const results = (() => {
-        if (connectorId === 'yahoo') {
+        if (connectorId === 'commsec') {
             applyDemoPriceRefreshFromConnector('medium');
             return {
                 title: `Synced ${connector.name}`,
-                body: `Fetched ${60 + Math.floor(Math.random() * 80)} market price snapshots. Updated portfolio pricing + 24h change view (demo).`
+                body: `Fetched ${60 + Math.floor(Math.random() * 80)} ASX price snapshots. Updated portfolio pricing + 24h change view (demo).`,
             };
         }
-        if (connectorId === 'plaid') {
+        if (connectorId === 'netwealth') {
             return {
                 title: `Synced ${connector.name}`,
-                body: `Linked ${1 + Math.floor(Math.random() * 2)} institution(s) and imported ${3 + Math.floor(Math.random() * 6)} custody accounts (demo).`
+                body: `Imported ${2 + Math.floor(Math.random() * 3)} wrap account(s) and ${4 + Math.floor(Math.random() * 6)} holding positions from Netwealth (demo).`,
             };
         }
-        if (connectorId === 'salesforce_investor') {
+        if (connectorId === 'macquarie') {
             return {
                 title: `Synced ${connector.name}`,
-                body: `Pulled investor profile updates and ${2 + Math.floor(Math.random() * 5)} document status changes (demo).`
+                body: `Refreshed Macquarie cash, wrap, and custody balances across ${2 + Math.floor(Math.random() * 2)} linked accounts (demo).`,
+            };
+        }
+        if (connectorId === 'commbank') {
+            return {
+                title: `Synced ${connector.name}`,
+                body: `Linked ${1 + Math.floor(Math.random() * 2)} CommBank NetBank account(s) and imported cash positions (demo).`,
+            };
+        }
+        if (connectorId === 'anz') {
+            return {
+                title: `Synced ${connector.name}`,
+                body: `Connected ${1 + Math.floor(Math.random() * 2)} ANZ account(s) and refreshed custody balances (demo).`,
+            };
+        }
+        if (connectorId === 'xero') {
+            return {
+                title: `Synced ${connector.name}`,
+                body: `Pulled ${1 + Math.floor(Math.random() * 3)} Xero entity ledger(s) and ${3 + Math.floor(Math.random() * 8)} distribution lines (demo).`,
             };
         }
         if (connectorId === 'docusign') {
@@ -2370,11 +2415,13 @@ const INVESTOR_DOCUMENTS = [
     { id: 'kyc-letter', title: 'KYC Verification Letter', type: 'Compliance', date: '2025-11-08', size: '120 KB', file: 'kyc-verification.pdf' },
     { id: 'alloc-memo', title: 'Allocation Strategy Memo', type: 'Strategy', date: '2026-02-20', size: '540 KB', file: 'allocation-memo.pdf' },
 ];
+const INVESTOR_UPLOADED_DOCS_KEY = 'rud_investor_uploaded_docs';
+let isInvestorDocumentUploadInitialized = false;
 
 const INVESTOR_STATIC_UPDATES = [
     { time: '2 hours ago', title: 'Q1 report published', body: 'Your Q1 2026 performance summary is now available in Documents.', icon: '📊' },
     { time: 'Yesterday', title: 'New allocation posted', body: 'Target weights updated for RGCIS Growth Fund II.', icon: '📈' },
-    { time: '3 days ago', title: 'Connector sync completed', body: 'Plaid custodian balances refreshed for your linked accounts.', icon: '🔌' },
+    { time: '3 days ago', title: 'Connector sync completed', body: 'Netwealth wrap balances refreshed for your linked accounts.', icon: '🔌' },
 ];
 
 function getInvestorPortfolioSnapshot() {
@@ -2488,49 +2535,259 @@ function renderInvestorDashboard() {
     `).join('');
 }
 
+function formatFileSize(bytes) {
+    const n = Number(bytes) || 0;
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+    return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function getUploadedInvestorDocuments() {
+    try {
+        const raw = localStorage.getItem(INVESTOR_UPLOADED_DOCS_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
+        if (Array.isArray(parsed)) return parsed;
+    } catch (e) {
+        // ignore
+    }
+    return [];
+}
+
+function setUploadedInvestorDocuments(docs) {
+    localStorage.setItem(INVESTOR_UPLOADED_DOCS_KEY, JSON.stringify(docs || []));
+}
+
+function getAllInvestorDocuments() {
+    return [...getUploadedInvestorDocuments(), ...INVESTOR_DOCUMENTS];
+}
+
+function inferUploadedDocType(filename) {
+    const ext = String(filename || '').split('.').pop()?.toLowerCase() || '';
+    if (ext === 'csv') return 'Data import';
+    if (ext === 'xlsx' || ext === 'xls') return 'Spreadsheet';
+    if (ext === 'json') return 'Structured data';
+    if (ext === 'pdf') return 'Report';
+    if (ext === 'doc' || ext === 'docx') return 'Document';
+    return 'Upload';
+}
+
+function buildDemoAiUploadSummary(file) {
+    const name = file.name || 'file';
+    const ext = name.split('.').pop()?.toLowerCase() || '';
+    const rows = 8 + Math.floor(Math.random() * 40);
+    const fields = 4 + Math.floor(Math.random() * 8);
+    if (ext === 'csv' || ext === 'xlsx' || ext === 'xls') {
+        return `AI parsed ~${rows} rows and mapped ${fields} fields into the investor database (demo).`;
+    }
+    if (ext === 'json') {
+        return `AI extracted structured JSON objects and stored them as queryable investor records (demo).`;
+    }
+    if (ext === 'pdf') {
+        return `AI read statement sections, balances, and dates — indexed for search and workflows (demo).`;
+    }
+    return `AI classified document content and stored key metadata in the platform database (demo).`;
+}
+
+function setInvestorUploadStatus(html, variant = 'processing') {
+    const el = document.getElementById('investor-doc-upload-status');
+    if (!el) return;
+    el.hidden = false;
+    el.className = `investor-doc-upload-status investor-doc-upload-status--${variant}`;
+    el.innerHTML = html;
+}
+
+function clearInvestorUploadStatus() {
+    const el = document.getElementById('investor-doc-upload-status');
+    if (!el) return;
+    el.hidden = true;
+    el.innerHTML = '';
+    el.className = 'investor-doc-upload-status';
+}
+
+async function processInvestorDocumentUploads(fileList) {
+    const files = Array.from(fileList || []).filter((f) => f && f.name);
+    if (!files.length) return;
+
+    setInvestorUploadStatus(
+        `<div class="spinner" style="width:18px;height:18px;display:inline-block;vertical-align:middle;margin-right:0.5rem;"></div> `
+        + `AI is analyzing ${files.length === 1 ? 'your document' : `${files.length} documents`}…`,
+        'processing',
+    );
+
+    await new Promise((r) => setTimeout(r, 1400 + Math.min(files.length * 400, 1200)));
+
+    const today = new Date().toISOString().slice(0, 10);
+    const uploaded = getUploadedInvestorDocuments();
+    const summaries = [];
+
+    files.forEach((file, index) => {
+        const aiSummary = buildDemoAiUploadSummary(file);
+        summaries.push(`<li><strong>${escapeHtml(file.name)}</strong> — ${escapeHtml(aiSummary)}</li>`);
+        uploaded.unshift({
+            id: `upload_${Date.now()}_${index}`,
+            title: file.name,
+            type: inferUploadedDocType(file.name),
+            date: today,
+            size: formatFileSize(file.size),
+            file: file.name,
+            uploaded: true,
+            aiSummary,
+        });
+    });
+
+    setUploadedInvestorDocuments(uploaded.slice(0, 20));
+    renderDocuments();
+
+    setInvestorUploadStatus(
+        `<strong><i class="fas fa-circle-check" aria-hidden="true"></i> Upload complete.</strong> `
+        + `AI analyzed your ${files.length === 1 ? 'file' : 'files'} and stored structured data in the platform database (demo).`
+        + `<ul class="investor-doc-upload-results">${summaries.join('')}</ul>`,
+        'success',
+    );
+    showSuccess(files.length === 1 ? 'Document indexed by AI (demo)' : `${files.length} documents indexed by AI (demo)`);
+}
+
+function setupInvestorDocumentUpload() {
+    if (isInvestorDocumentUploadInitialized) return;
+    const dropzone = document.getElementById('investor-doc-upload-dropzone');
+    const input = document.getElementById('investor-doc-upload-input');
+    const browseBtn = document.getElementById('investor-doc-upload-btn');
+    if (!dropzone || !input) return;
+
+    isInvestorDocumentUploadInitialized = true;
+
+    const openPicker = (e) => {
+        e?.preventDefault?.();
+        e?.stopPropagation?.();
+        input.click();
+    };
+
+    dropzone.addEventListener('click', openPicker);
+    dropzone.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            openPicker(e);
+        }
+    });
+    browseBtn?.addEventListener('click', openPicker);
+
+    input.addEventListener('change', () => {
+        if (input.files?.length) processInvestorDocumentUploads(input.files);
+        input.value = '';
+    });
+
+    ['dragenter', 'dragover'].forEach((evt) => {
+        dropzone.addEventListener(evt, (e) => {
+            e.preventDefault();
+            dropzone.classList.add('investor-doc-upload-dropzone--active');
+        });
+    });
+    ['dragleave', 'drop'].forEach((evt) => {
+        dropzone.addEventListener(evt, (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('investor-doc-upload-dropzone--active');
+        });
+    });
+    dropzone.addEventListener('drop', (e) => {
+        if (e.dataTransfer?.files?.length) processInvestorDocumentUploads(e.dataTransfer.files);
+    });
+}
+
 function renderDocuments() {
+    setupInvestorDocumentUpload();
     const listEl = document.getElementById('investor-documents-list');
+    const countEl = document.getElementById('investor-doc-library-count');
     if (!listEl) return;
 
-    listEl.innerHTML = INVESTOR_DOCUMENTS.map((doc) => `
-        <div class="investor-doc-card">
-            <div class="investor-doc-icon" aria-hidden="true">${getDocumentIcon(doc.type)}</div>
+    const docs = getAllInvestorDocuments();
+    if (countEl) {
+        countEl.textContent = `${docs.length} document${docs.length === 1 ? '' : 's'}`;
+    }
+
+    if (!docs.length) {
+        listEl.innerHTML = '<div class="investor-doc-empty">No documents yet. Upload a file above to see AI indexing in action.</div>';
+        return;
+    }
+
+    listEl.innerHTML = docs.map((doc) => `
+        <div class="investor-doc-card ${getDocumentCardClass(doc.type)}">
+            <div class="investor-doc-icon-wrap" aria-hidden="true">${getDocumentIconHtml(doc.type)}</div>
             <div class="investor-doc-meta">
                 <div class="investor-doc-title">${escapeHtml(doc.title)}</div>
                 <div class="investor-doc-sub">
-                    <span class="investor-doc-type">${escapeHtml(doc.type)}</span>
+                    <span class="investor-doc-type ${doc.uploaded ? 'investor-doc-badge-upload' : ''}">${escapeHtml(doc.type)}</span>
                     <span>${escapeHtml(doc.date)}</span>
                     <span>${escapeHtml(doc.size)}</span>
                 </div>
+                ${doc.aiSummary ? `<div class="investor-doc-ai-note"><i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i><span>${escapeHtml(doc.aiSummary)}</span></div>` : ''}
             </div>
             <div class="investor-doc-actions">
-                <button type="button" class="btn-secondary" onclick="previewInvestorDocument('${doc.id}')">Preview</button>
-                <button type="button" class="btn-primary" onclick="downloadInvestorDocument('${doc.id}')">Download</button>
+                <button type="button" class="investor-doc-btn investor-doc-btn--ghost" onclick="previewInvestorDocument(${JSON.stringify(doc.id)})">
+                    <i class="fas fa-eye" aria-hidden="true"></i> Preview
+                </button>
+                <button type="button" class="investor-doc-btn investor-doc-btn--primary" onclick="downloadInvestorDocument(${JSON.stringify(doc.id)})">
+                    <i class="fas fa-download" aria-hidden="true"></i> Download
+                </button>
             </div>
         </div>
     `).join('');
 }
 
-function getDocumentIcon(type) {
-    const icons = { Statement: '📄', Performance: '📊', Tax: '🧾', Compliance: '✅', Strategy: '📋' };
-    return icons[type] || '📁';
+function getDocumentCardClass(type) {
+    const map = {
+        Statement: 'investor-doc-card--statement',
+        Performance: 'investor-doc-card--performance',
+        Tax: 'investor-doc-card--tax',
+        Compliance: 'investor-doc-card--compliance',
+        Strategy: 'investor-doc-card--strategy',
+        Upload: 'investor-doc-card--upload',
+        'Data import': 'investor-doc-card--data',
+        Spreadsheet: 'investor-doc-card--spreadsheet',
+        'Structured data': 'investor-doc-card--data',
+        Report: 'investor-doc-card--report',
+        Document: 'investor-doc-card--document',
+    };
+    return map[type] || 'investor-doc-card--document';
+}
+
+function getDocumentIconHtml(type) {
+    const map = {
+        Statement: 'fa-file-invoice',
+        Performance: 'fa-chart-line',
+        Tax: 'fa-receipt',
+        Compliance: 'fa-shield-halved',
+        Strategy: 'fa-lightbulb',
+        Upload: 'fa-cloud-arrow-up',
+        'Data import': 'fa-table',
+        Spreadsheet: 'fa-file-excel',
+        'Structured data': 'fa-database',
+        Report: 'fa-file-pdf',
+        Document: 'fa-file-lines',
+    };
+    const icon = map[type] || 'fa-file';
+    return `<i class="fas ${icon}"></i>`;
 }
 
 function findInvestorDocument(id) {
-    return INVESTOR_DOCUMENTS.find((d) => d.id === id);
+    return getAllInvestorDocuments().find((d) => d.id === id);
 }
 
 function previewInvestorDocument(id) {
     const doc = findInvestorDocument(id);
     if (!doc) return;
-    alert(`Demo preview: ${doc.title}\n\nThis is a mock document for the investor portal demo. No file is stored on the server.`);
+    const aiLine = doc.aiSummary ? `\n\nAI index (demo): ${doc.aiSummary}` : '';
+    alert(`Demo preview: ${doc.title}\n\nThis is a mock document for the investor portal demo. No file is stored on the server.${aiLine}`);
 }
 
 function downloadInvestorDocument(id) {
     const doc = findInvestorDocument(id);
     if (!doc) return;
     const blob = new Blob(
-        [`Investor Intelligence Platform — Demo Document\n\n${doc.title}\nGenerated: ${doc.date}\n\nThis is placeholder content for demo purposes only.`],
+        [
+            `Investor Intelligence Platform — Demo Document\n\n${doc.title}\nGenerated: ${doc.date}\n`
+            + (doc.aiSummary ? `\nAI analysis (demo): ${doc.aiSummary}\n` : '')
+            + `\nThis is placeholder content for demo purposes only.`,
+        ],
         { type: 'text/plain' }
     );
     const url = URL.createObjectURL(blob);
@@ -2625,13 +2882,13 @@ function answerInvestorFaq(query) {
         return `Demo performance snapshot:\n• MTD return: **+${mtd}%**\n• YTD return: **+${ytd}%**\n• Unrealized P/L: **${formatSignedUSD(snap.unrealizedPnl)}**\n\nSee the Dashboard tab for the 6-month performance chart.`;
     }
     if (/document|report|statement|download|pdf/.test(q)) {
-        const names = INVESTOR_DOCUMENTS.slice(0, 3).map((d) => `• ${d.title}`).join('\n');
-        return `You have **${INVESTOR_DOCUMENTS.length}** documents available (demo):\n${names}\n\nOpen the **Documents** tab to preview or download mock files.`;
+        const names = getAllInvestorDocuments().slice(0, 3).map((d) => `• ${d.title}`).join('\n');
+        return `You have **${getAllInvestorDocuments().length}** documents available (demo):\n${names}\n\nOpen the **Documents** tab to upload files — AI will analyze CSV, Excel, PDF, and more, then store structured data in the demo database.`;
     }
     if (/integrat|connect|sync|plaid|docusign|salesforce/.test(q)) {
         const state = getClientConnectorState();
         const connected = Object.values(state).filter((c) => c && c.connected).length;
-        return `**${connected}** of ${CLIENT_CONNECTORS.length} connectors are connected (demo UI only). Open **Connected Accounts** to link Plaid, DocuSign, or Salesforce and run a mock sync.`;
+        return `**${connected}** of ${CLIENT_CONNECTORS.length} connectors are connected (demo UI only). Open **Connected Accounts** to link Netwealth, CommBank, Xero, or CommSec and run a mock sync.`;
     }
     if (/rgcf|growth fund|rgcis fund/.test(q)) {
         const rg = snap.holdings.find((h) => h.symbol === PORTFOLIO_PLATFORM_HOLDING);

@@ -58,19 +58,20 @@ window.DEMO_BRANDING = {
         marketingTitle: 'Marketing & Lead Generation',
         marketingHelp: 'Capture leads, monitor campaigns, and track SEO performance — demo data with CRM handoff.',
         opsIntegrationsTitle: 'Integration Hub',
-        opsIntegrationsHelp: 'Connect CRM, marketing, and support systems — UI-only demo with sync logging.',
+        opsIntegrationsHelp: 'Connect Xero, MYOB, Netwealth, Macquarie, and other AU platforms — UI-only demo with sync logging.',
         investors: 'Investor Directory',
         investorSearch: 'Search by investor ID or email...',
         investorDashboard: 'Investor Dashboard',
         investorDashboardHelp: 'Your portfolio at a glance — allocation, performance, and recent updates.',
         documents: 'Documents & Reports',
-        documentsHelp: 'Statements, performance reports, and compliance documents — demo downloads only.',
+        documentsHelp: 'Upload or download statements and reports — AI indexes uploads into the demo database.',
+        documentsUploadTagline: 'Our AI analyzes each upload and stores structured data in the platform database — CSV holdings, spreadsheets, PDF statements, and more. Demo only; files stay in your browser.',
         investorChatTitle: 'Investor Assistant',
         investorChatHelp: 'Ask about your portfolio, allocation, performance, documents, or connected accounts — instant demo answers, no backend required.',
         portfolio: 'Investor Portfolio',
         portfolioHelp: 'Holdings across funds, public markets, and cash — illustrative only, no live trading.',
         integrations: 'Connected Accounts',
-        integrationsHelp: 'Link banking, CRM, documents, and market data — UI-only demo connectors.',
+        integrationsHelp: 'Link Netwealth, CommBank, ANZ, Xero, and market data — UI-only demo connectors.',
         chatTitle: 'Operations AI Assistant',
         chatHelp: 'Ask in plain language — the assistant stays close to your demo data and understands investor operations, alerts, and workflows. Verified SQL templates are used when possible; otherwise the model drafts a query for this database.',
         chatWelcome: 'Hello — I\'m your operations assistant. I\'ll keep things courteous and focused on investor intelligence: portfolios, activity, alerts, and what your team might do next.',
@@ -174,6 +175,7 @@ function applyDemoBranding() {
     setText('section-investor-dashboard-help', b.sections.investorDashboardHelp);
     setText('section-documents-title', b.sections.documents);
     setText('section-documents-help', b.sections.documentsHelp);
+    setText('investor-doc-upload-tagline', b.sections.documentsUploadTagline);
     setText('section-investor-chat-title', b.sections.investorChatTitle);
     setText('section-investor-chat-help', b.sections.investorChatHelp);
     setText('section-portfolio-title', b.sections.portfolio);
